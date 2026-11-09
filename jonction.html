@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="theme.js"></script>
+<meta name="theme-color" content="#1d3a4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Jonction">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Paramètres de jonction</title>
+<style>
+:root{color-scheme:light;--btnink:#fff;--bg:#eceff1;--card:#fff;--ink:#17252f;--mute:#5f6e78;--line:#d3dadf;--acc:#1d3a4f;--hot:#c8501e;--ok:#2e7d4f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="clair"]){color-scheme:dark;--bg:#10171c;--card:#1a242b;--ink:#e6ecef;--mute:#92a1ab;--line:#2c3a43;--acc:#7fb2d0;--hot:#f0895a;--btnink:#10171c}}
+:root[data-theme="sombre"]{color-scheme:dark;--bg:#10171c;--card:#1a242b;--ink:#e6ecef;--mute:#92a1ab;--line:#2c3a43;--acc:#7fb2d0;--hot:#f0895a;--btnink:#10171c}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+header{background:#1d3a4f;color:#fff;padding:12px 16px}
+header h1{margin:0;font-size:18px;font-weight:650}
+#etat{font-size:13px;opacity:.85;margin-top:2px}
+#etat.off{color:#ffc9a8;opacity:1}
+main{flex:1;overflow-y:auto;padding:14px 14px 90px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;padding:14px 4px;border:0;background:none;font:inherit;font-weight:600;color:var(--mute);border-top:3px solid transparent}
+nav button.on{color:var(--acc);border-top-color:var(--hot)}
+section{display:none}section.on{display:block}
+label{display:block;font-size:14px;color:var(--mute);margin:12px 0 4px}
+select,input,textarea{width:100%;font:inherit;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+.carte{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--acc);border-radius:8px;padding:12px 14px;margin-top:14px}
+.carte h2{margin:0 0 8px;font-size:19px}
+.carte .tag{font-size:12px;color:var(--ok);font-weight:600;margin-left:6px}
+.grille{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.grille div span{display:block;font-size:12px;color:var(--mute)}
+.grille div b{font-size:20px;color:var(--hot)}
+.grille .pleine{grid-column:1/-1}
+.grille .pleine b{font-size:16px;color:var(--ink);font-weight:500}
+.pied{margin-top:8px;font-size:12px;color:var(--mute)}
+.tableau{overflow-x:auto;margin-top:12px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:14px;white-space:nowrap}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}
+th{position:sticky;top:0;background:var(--bg);font-weight:650}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{width:100%;margin-top:18px;padding:14px;border:0;border-radius:8px;background:var(--acc);color:var(--btnink);font:inherit;font-weight:650}
+
+.btn:disabled{opacity:.45}
+.msg{margin-top:12px;padding:10px;border-radius:8px;background:var(--card);border:1px solid var(--line);font-size:14px}
+tr[data-n]{cursor:pointer}
+.btn.sec{background:none;color:var(--acc);border:1px solid var(--line)}
+.btn.sup{background:var(--hot);color:#fff}
+dialog{width:min(92vw,520px);max-height:92vh;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:14px}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.logo{display:block;width:100%;max-width:320px;margin:0 auto 4px;background:#fff;padding:8px 14px;border-radius:8px}
+#sugg{display:none;max-height:45vh;overflow-y:auto;border:1px solid var(--line);border-radius:8px;background:var(--card);margin-top:4px}
+#sugg button{display:block;width:100%;text-align:left;padding:13px 12px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:var(--ink)}
+#chg{background:none;border:0;color:#cfe0ec;text-decoration:underline;padding:4px 0;font:inherit;font-size:13px}
+#accueil{display:inline-block;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:2px 0 8px}
+.vide{color:var(--mute);margin-top:24px;text-align:center}
+</style>
+</head>
+<body>
+<header><a id="accueil" href="./">← Accueil</a><h1>Paramètres de jonction</h1><div id="etat">Chargement…</div><button id="chg" type="button">Changer de code</button></header>
+<main>
+  <section id="s-rech" class="on">
+    <img class="logo" src="data:image/png;base64,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" alt="Novafit">
+    <label for="matiere">Matière</label>
+    <input id="matiere" type="search" placeholder="Tape les premières lettres…" autocomplete="off">
+    <div id="sugg"></div>
+    <div id="resultats"></div>
+  </section>
+  <section id="s-base">
+    <input id="filtre" type="search" placeholder="Filtrer (matière, presse, accessoire…)">
+    <div class="tableau"><table id="table"></table></div>
+    <p class="pied" id="compte"></p>
+    <p class="pied">Touche une ligne pour la corriger (code administrateur).</p>
+  </section>
+  <section id="s-ajout">
+    <div id="hors" class="msg" style="display:none">Connexion requise pour enregistrer un paramètre.</div>
+    <label for="f-m">Matière</label><input id="f-m" list="l-m" autocomplete="off">
+    <label for="f-p">Presse</label><input id="f-p" list="l-p" autocomplete="off">
+    <datalist id="l-m"></datalist><datalist id="l-p"></datalist>
+    <div class="row2">
+      <div><label for="f-ts">Température supérieure</label><input id="f-ts" inputmode="decimal"></div>
+      <div><label for="f-ti">Température inférieure</label><input id="f-ti" inputmode="decimal"></div>
+      <div><label for="f-pr">Pression</label><input id="f-pr" inputmode="decimal"></div>
+      <div><label for="f-t">Temps</label><input id="f-t" inputmode="decimal"></div>
+    </div>
+    <label for="f-a">Accessoire</label><input id="f-a">
+    <label for="f-c">Commentaire</label><textarea id="f-c" rows="3"></textarea>
+    <button class="btn" id="envoyer">Enregistrer le paramètre</button>
+    <div id="retour"></div>
+  </section>
+</main>
+<dialog id="dlg"></dialog>
+<nav>
+  <button data-s="s-rech" class="on">Recherche</button>
+  <button data-s="s-base">Base</button>
+  <button data-s="s-ajout">Ajout</button>
+</nav>
+
+<script src="config.js"></script>
+<script>
+const API_URL = (window.CONFIG && window.CONFIG.URL_JONCTION) || "";
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const vide = v => (v === "" || v == null) ? "—" : esc(v);
+const dateFr = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split("-").reverse().join("/") : (d || "");
+const tri = (a, b) => String(a).localeCompare(String(b), "fr", {numeric:true, sensitivity:"base"});
+
+const VERSION = "v6";
+const MSG_ADMIN = "Réservé à l’administrateur : touche « Changer de code » en haut de l’écran et saisis le code administrateur.";
+let rows = [], maj = "", MATS = [];
+try { const c = JSON.parse(localStorage.getItem("cache") || "null"); if (c) { rows = c.rows; maj = c.maj; } } catch (e) {}
+
+const norm = s => String(s).toLowerCase().replace(/\s+/g, " ").trim();
+let CODE = "", ADMIN = "";
+try { CODE = localStorage.getItem("code") || ""; ADMIN = localStorage.getItem("admin") || ""; } catch (e) {}
+
+function code() {
+  if (!CODE) {
+    CODE = prompt("Code d’accès de l’équipe :") || "";
+    if (CODE) try { localStorage.setItem("code", CODE); } catch (e) {}
+  }
+  return CODE;
+}
+
+function etat() {
+  const e = $("#etat"), off = !navigator.onLine;
+  e.className = off ? "off" : "";
+  e.textContent = VERSION + " · " + (off ? "Hors ligne · " : "") + (maj ? "données du " + maj : "aucune donnée") + (ADMIN ? " · admin" : "");
+  $("#envoyer").disabled = off || !ADMIN;
+  $("#hors").style.display = (off || !ADMIN) ? "block" : "none";
+  $("#hors").textContent = off ? "Connexion requise pour enregistrer un paramètre." : MSG_ADMIN;
+}
+
+async function synchro() {
+  etat();
+  if (!navigator.onLine) return;
+  $("#etat").textContent += " · synchronisation…";
+  try {
+    const r = await fetch(API_URL + "?code=" + encodeURIComponent(code()) + "&t=" + Date.now(), {cache: "no-store"});
+    const j = await r.json();
+    if (j.error === "code") { CODE = ""; try { localStorage.removeItem("code"); } catch (e) {} $("#etat").textContent = "Code incorrect, rouvre l’appli."; return; }
+    rows = j.rows;
+    if (j.admin) { ADMIN = CODE; try { localStorage.setItem("admin", CODE); } catch (e) {} }
+    else { ADMIN = ""; try { localStorage.removeItem("admin"); } catch (e) {} }
+    maj = new Date().toLocaleString("fr-FR", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"});
+    localStorage.setItem("cache", JSON.stringify({rows, maj}));
+  } catch (e) { /* on garde la copie locale */ }
+  etat(); rendre();
+}
+
+function rendre() {
+  const mats = [...new Set(rows.map(r => r.m))].sort(tri);
+  MATS = mats;
+  $("#l-m").innerHTML = mats.map(m => `<option value="${esc(m)}">`).join("");
+  $("#l-p").innerHTML = [...new Set(rows.map(r => r.p))].sort(tri).map(p => `<option value="${esc(p)}">`).join("");
+  cartes(); tableau();
+}
+
+function suggerer() {
+  const v = $("#matiere").value.trim().toLowerCase(), b = $("#sugg");
+  const l = MATS.filter(m => String(m).toLowerCase().startsWith(v));
+  b.innerHTML = l.map(m => `<button type="button" data-m="${esc(m)}">${esc(m)}</button>`).join("") ||
+    '<p class="vide" style="margin:12px">Aucune matière ne commence par « ' + esc(v) + " ».</p>";
+  b.style.display = "block";
+}
+
+function cartes() {
+  const v = $("#matiere").value.trim().toLowerCase(), out = $("#resultats");
+  const m = MATS.find(x => String(x).toLowerCase() === v);
+  if (m === undefined) { out.innerHTML = '<p class="vide">' + (v ? "Choisis une matière dans la liste." : "Tape les premières lettres d’une matière.") + "</p>"; return; }
+  const sel = rows.filter(r => r.m === m);
+  const presses = [...new Set(sel.map(r => r.p))].sort(tri);
+  out.innerHTML = presses.map(p => {
+    const l = sel.filter(r => r.p === p).sort((a, b) => String(b.d).localeCompare(String(a.d)));
+    return l.map((r, i) => `<div class="carte"><h2>${vide(p)}${l.length > 1 && i === 0 ? '<span class="tag">le plus récent</span>' : ""}</h2>
+      <div class="grille">
+        <div><span>Température supérieure</span><b>${vide(r.ts)}</b></div>
+        <div><span>Température inférieure</span><b>${vide(r.ti)}</b></div>
+        <div><span>Pression</span><b>${vide(r.pr)}</b></div>
+        <div><span>Temps</span><b>${vide(r.t)}</b></div>
+        <div class="pleine"><span>Accessoire</span><b>${vide(r.a)}</b></div>
+        <div class="pleine"><span>Commentaire</span><b>${vide(r.c)}</b></div>
+      </div><div class="pied">Validé le ${esc(dateFr(r.d)) || "—"}</div></div>`).join("");
+  }).join("");
+}
+
+function tableau() {
+  const q = $("#filtre").value.toLowerCase().trim();
+  const l = rows.filter(r => !q || [r.m, r.p, r.a, r.c].join(" ").toLowerCase().includes(q))
+                .sort((a, b) => tri(a.m, b.m) || tri(a.p, b.p));
+  $("#table").innerHTML = "<tr><th>Matière</th><th>Presse</th><th>T° sup.</th><th>T° inf.</th><th>Pression</th><th>Temps</th><th>Accessoire</th><th>Commentaire</th><th>Date</th></tr>" +
+    l.slice(0, 300).map(r => `<tr${r.n ? ' data-n="' + r.n + '"' : ""}><td>${vide(r.m)}</td><td>${vide(r.p)}</td><td>${vide(r.ts)}</td><td>${vide(r.ti)}</td><td>${vide(r.pr)}</td><td>${vide(r.t)}</td><td>${vide(r.a)}</td><td>${vide(r.c)}</td><td>${esc(dateFr(r.d))}</td></tr>`).join("");
+  $("#compte").textContent = l.length + " ligne(s)" + (l.length > 300 ? " (300 affichées, affine le filtre)" : "");
+}
+
+const CH = [["m","Matière"],["p","Presse"],["ts","Température supérieure"],["ti","Température inférieure"],["pr","Pression"],["t","Temps"],["a","Accessoire"],["c","Commentaire"]];
+let edN = null;
+
+function codeAdmin() { return ADMIN; }
+
+async function appel(payload) {
+  const cle = codeAdmin();
+  if (!cle) throw new Error("noadmin");
+  const r = await fetch(API_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({code:cle, ...payload})});
+  const j = await r.json();
+  if (j.error === "code") { ADMIN = ""; try { localStorage.removeItem("admin"); } catch (e) {} }
+  return j;
+}
+
+function editer(n) {
+  if (!navigator.onLine) { alert("Connexion requise pour corriger une ligne."); return; }
+  const r = rows.find(x => x.n === n);
+  if (!r) return;
+  if (!ADMIN) { alert(MSG_ADMIN); return; }
+  edN = n;
+  $("#dlg").innerHTML = "<h2 style='margin:0 0 4px;font-size:18px'>Corriger la ligne</h2>" +
+    CH.map(([k, l]) => `<label for="e-${k}">${l}</label>` + (k === "c" ? `<textarea id="e-${k}" rows="3"></textarea>` : `<input id="e-${k}"${k === "m" ? ' list="l-m"' : k === "p" ? ' list="l-p"' : ""}>`)).join("") +
+    '<button class="btn" id="e-ok">Enregistrer la correction</button><button class="btn sup" id="e-sup">Supprimer la ligne</button><button class="btn sec" id="e-non">Annuler</button><div id="e-retour" class="pied"></div>';
+  CH.forEach(([k]) => $("#e-" + k).value = r[k] ?? "");
+  $("#e-ok").onclick = () => corriger(false);
+  $("#e-sup").onclick = () => corriger(true);
+  $("#e-non").onclick = () => $("#dlg").close();
+  $("#dlg").showModal();
+}
+
+async function corriger(suppr) {
+  const r = rows.find(x => x.n === edN), info = $("#e-retour");
+  const data = {}; CH.forEach(([k]) => data[k] = $("#e-" + k).value.trim());
+  if (!suppr && (!data.m || !data.p)) { info.textContent = "La matière et la presse sont obligatoires."; return; }
+  if (suppr && !confirm("Supprimer définitivement cette ligne ?")) return;
+  info.textContent = "Enregistrement…";
+  try {
+    const j = await appel({action: suppr ? "delete" : "edit", row: edN, orig: {m: r.m, p: r.p}, data});
+    if (!j.ok) throw new Error(j.error);
+    $("#dlg").close(); await synchro();
+  } catch (e) {
+    info.textContent = e.message === "noadmin" ? MSG_ADMIN : e.message === "code" ? "Le code administrateur n’est plus valide : touche « Changer de code »." : e.message === "obsolete" ? "Cette ligne a changé entre-temps : ferme la fenêtre, l’appli va se resynchroniser." : "Échec. Vérifie la connexion et réessaie.";
+    if (e.message === "obsolete") synchro();
+  }
+}
+
+async function envoyer() {
+  const g = id => $("#f-" + id).value.trim();
+  const data = {m:g("m"), p:g("p"), ts:g("ts"), ti:g("ti"), pr:g("pr"), t:g("t"), a:g("a"), c:g("c")};
+  const retour = $("#retour");
+  if (!data.m || !data.p) { retour.innerHTML = '<div class="msg">La matière et la presse sont obligatoires.</div>'; return; }
+  $("#envoyer").disabled = true; retour.innerHTML = '<div class="msg">Enregistrement…</div>';
+  try {
+    const j = await appel({action:"add", data});
+    if (!j.ok) throw new Error(j.error);
+    ["m","p","ts","ti","pr","t","a","c"].forEach(i => $("#f-" + i).value = "");
+    retour.innerHTML = '<div class="msg">Paramètre enregistré.</div>';
+    const nouvelle = {n: 0, ...data, d: new Date().toISOString().slice(0, 10)};
+    ["m", "p"].forEach(k => { const f = rows.find(x => norm(x[k]) === norm(nouvelle[k])); if (f) nouvelle[k] = f[k]; });
+    rows.push(nouvelle);
+    try { localStorage.setItem("cache", JSON.stringify({rows, maj})); } catch (e) {}
+    rendre();
+    synchro();
+  } catch (e) {
+    retour.innerHTML = '<div class="msg">' + (e.message === "noadmin" ? MSG_ADMIN : e.message === "code" ? "Le code administrateur n’est plus valide : touche « Changer de code »." : "Échec de l’enregistrement. Vérifie la connexion et réessaie.") + "</div>";
+  }
+  etat();
+}
+
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button, section").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); $("#" + b.dataset.s).classList.add("on");
+});
+$("#matiere").oninput = () => { suggerer(); cartes(); };
+$("#matiere").onfocus = e => { e.target.select(); suggerer(); };
+$("#matiere").onkeydown = e => { if (e.key === "Enter") { $("#sugg").style.display = "none"; e.target.blur(); } };
+$("#sugg").onclick = e => {
+  const b = e.target.closest("button[data-m]"); if (!b) return;
+  $("#matiere").value = b.dataset.m; $("#sugg").style.display = "none"; cartes();
+};
+document.addEventListener("click", e => { if (!e.target.closest("#matiere, #sugg")) $("#sugg").style.display = "none"; });
+$("#filtre").oninput = tableau;
+$("#envoyer").onclick = envoyer;
+$("#chg").onclick = () => {
+  if (!navigator.onLine) { alert("Connexion requise pour changer de code."); return; }
+  CODE = ""; ADMIN = "";
+  try { localStorage.removeItem("code"); localStorage.removeItem("admin"); } catch (e) {}
+  synchro();
+};
+$("#table").onclick = e => { const tr = e.target.closest("tr[data-n]"); if (tr) editer(+tr.dataset.n); };
+addEventListener("online", synchro);
+addEventListener("offline", etat);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) synchro(); });
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+rendre(); synchro();
+</script>
+</body>
+</html>

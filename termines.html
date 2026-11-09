@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Interventions finies</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="commun.css">
+</head>
+<body>
+<div class="page" id="page" style="max-width:none">
+  <div class="haut">
+    <a href="./">← Accueil</a>
+    <h1>Interventions finies <span class="lecture" id="mode">Lecture seule</span></h1>
+    <div>
+      <button class="btn" id="btnModifier" type="button" hidden>Modifier</button>
+      <button class="btn vert" id="btnEnregistrer" type="button" hidden>Enregistrer</button>
+      <button class="btn" id="btnAnnuler" type="button" hidden>Annuler</button>
+    </div>
+  </div>
+  <div class="filtres">
+    <div><label for="recherche">Recherche libre</label><input class="champ" id="recherche" type="search" placeholder="Tous les champs"></div>
+    <div><label for="fBon">N° de BL</label><input class="champ" id="fBon" type="search"></div>
+    <div><label for="fCommande">N° de commande</label><input class="champ" id="fCommande" type="search"></div>
+    <div><label for="fClient">Client</label><input class="champ" id="fClient" type="search"></div>
+    <div><label for="fDu">Date : du</label><input class="champ" id="fDu" type="date"></div>
+    <div><label for="fAu">au</label><input class="champ" id="fAu" type="date"></div>
+    <div><button class="btn" type="button" onclick="effacerFiltres()">Effacer les filtres</button></div>
+  </div>
+  <div id="infos"></div>
+  <div id="erreur" class="erreurPage" hidden></div>
+  <div class="tableau" id="zone" hidden></div>
+</div>
+
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script>
+const CLE_CACHE = 'termineCache';
+const LIMITE_EDITION = 50;
+let donnees = null, horsLigne = false, edition = false, edits = {}, minuteur = null;
+
+function val(id) { return document.getElementById(id).value.trim(); }
+
+function montrerErreur(texte) {
+  document.getElementById('zone').hidden = true;
+  document.getElementById('infos').textContent = '';
+  const e = document.getElementById('erreur');
+  e.textContent = texte;
+  e.hidden = false;
+}
+
+async function charger() {
+  document.getElementById('infos').textContent = 'Chargement...';
+  try {
+    donnees = await Nova.api('termines');
+    horsLigne = false;
+    try { localStorage.setItem(CLE_CACHE, JSON.stringify(donnees)); } catch (e) {}
+  } catch (e) {
+    let memo = null;
+    if (e.code === 'reseau') { try { memo = JSON.parse(localStorage.getItem(CLE_CACHE)); } catch (x) {} }
+    if (!memo || !memo.ok) { montrerErreur(e.message); return; }
+    donnees = memo;
+    horsLigne = true;
+  }
+  boutons();
+  dessiner();
+}
+
+function boutons() {
+  const admin = !!(donnees && donnees.admin) && !horsLigne;
+  document.getElementById('btnModifier').hidden = !admin || edition;
+  document.getElementById('btnEnregistrer').hidden = !edition;
+  document.getElementById('btnAnnuler').hidden = !edition;
+  const mode = document.getElementById('mode');
+  mode.textContent = edition ? 'Mode modification' : 'Lecture seule';
+  mode.className = 'lecture' + (edition ? ' edition' : '');
+}
+
+// Date d'une ligne : "09/11/2026" (ou "2026-11-09") -> nombre comparable ; null si illisible
+function dateLigne(s) {
+  s = String(s);
+  let m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1]);
+  m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null;
+}
+function jour(id) {
+  const v = val(id);
+  return v ? Date.UTC(+v.slice(0, 4), +v.slice(5, 7) - 1, +v.slice(8, 10)) : null;
+}
+function criteres() {
+  return { texte: Nova.norm(val('recherche')), bon: Nova.norm(val('fBon')), commande: Nova.norm(val('fCommande')),
+           client: Nova.norm(val('fClient')), du: jour('fDu'), au: jour('fAu') };
+}
+function filtreActif(c) { return !!(c.texte || c.bon || c.commande || c.client || c.du !== null || c.au !== null); }
+
+// Colonnes : 0 N° de BL, 1 N° de commande, 2 Date, 3 Client
+function groupeCorrespond(gr, c) {
+  const p = gr[0].l;
+  if (c.bon && Nova.norm(p[0]).indexOf(c.bon) < 0) return false;
+  if (c.commande && Nova.norm(p[1]).indexOf(c.commande) < 0) return false;
+  if (c.client && Nova.norm(p[3]).indexOf(c.client) < 0) return false;
+  if (c.du !== null || c.au !== null) {
+    const t = dateLigne(p[2]);
+    if (t === null || (c.du !== null && t < c.du) || (c.au !== null && t > c.au)) return false;
+  }
+  if (c.texte && !gr.some(x => Nova.norm(x.l.join(' ')).indexOf(c.texte) >= 0)) return false;
+  return true;
+}
+
+// Regroupe les lignes d'un même bon (une ligne par bande) ; les plus récents d'abord
+function groupes() {
+  const g = [];
+  donnees.lignes.forEach((l, i) => {
+    const x = { l: l, num: donnees.numeros[i] };
+    const dernier = g[g.length - 1];
+    if (dernier && l[0] !== '' && dernier[0].l[0] === l[0]) dernier.push(x); else g.push([x]);
+  });
+  return g.reverse();
+}
+
+function valeurCellule(x, col) {
+  return edits[x.num] ? edits[x.num][col - 1] : x.l[col];
+}
+
+function dessiner() {
+  document.getElementById('erreur').hidden = true;
+  const crit = criteres();
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const tr = document.createElement('tr');
+  ['Document'].concat(donnees.entetes).forEach(t => {
+    const th = document.createElement('th');
+    th.textContent = t;
+    tr.appendChild(th);
+  });
+  thead.appendChild(tr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  const plafond = edition ? (filtreActif(crit) ? 100 : LIMITE_EDITION) : Infinity;
+  let parite = 0, nbBons = 0, nbLignes = 0, coupe = false;
+  for (const gr of groupes()) {
+    if (!groupeCorrespond(gr, crit)) continue;
+    if (nbBons >= plafond) { coupe = true; break; }
+    parite = 1 - parite;
+    nbBons++;
+    gr.forEach((x, i) => {
+      const ligne = document.createElement('tr');
+      ligne.className = (parite ? 'g1' : 'g2') + (i === 0 ? ' debut' : '') + (edits[x.num] ? ' modifie' : '');
+      const tdDoc = document.createElement('td');
+      const idDoc = i === 0 ? donnees.docs[Nova.cleCommande(x.l[1])] : null;
+      if (idDoc) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn';
+        b.textContent = 'PDF';
+        b.onclick = () => Nova.ouvrirVisio({ id: idDoc, titre: x.l[1] + (x.l[3] ? ' · ' + x.l[3] : '') });
+        tdDoc.appendChild(b);
+      }
+      ligne.appendChild(tdDoc);
+      x.l.forEach((v, col) => {
+        const td = document.createElement('td');
+        if (edition && col >= 1 && col <= 13) {
+          const inp = document.createElement('input');
+          inp.value = valeurCellule(x, col);
+          inp.oninput = () => {
+            if (!edits[x.num]) edits[x.num] = x.l.slice(1, 14);
+            edits[x.num][col - 1] = inp.value;
+            ligne.classList.add('modifie');
+            boutons();
+          };
+          td.appendChild(inp);
+        } else {
+          td.textContent = v;
+        }
+        ligne.appendChild(td);
+      });
+      tbody.appendChild(ligne);
+      nbLignes++;
+    });
+  }
+  table.appendChild(tbody);
+  const zone = document.getElementById('zone');
+  zone.innerHTML = '';
+  zone.appendChild(table);
+  zone.hidden = false;
+
+  let texte = nbBons + (nbBons > 1 ? ' bons' : ' bon') + ' · ' + nbLignes + (nbLignes > 1 ? ' lignes' : ' ligne');
+  if (donnees.total > donnees.affiches) texte += ' (les ' + donnees.affiches + ' dernières lignes sur ' + donnees.total + ')';
+  if (coupe) texte += ' · affichage limité à ' + plafond + ' bons en modification : utilise les filtres pour en trouver d\'autres';
+  if (horsLigne) texte += ' · données enregistrées sur l\'appareil (hors ligne)';
+  document.getElementById('infos').textContent = texte;
+  const nbModif = Object.keys(edits).length;
+  document.getElementById('btnEnregistrer').textContent = nbModif ? 'Enregistrer (' + nbModif + ')' : 'Enregistrer';
+}
+
+function effacerFiltres() {
+  ['recherche', 'fBon', 'fCommande', 'fClient', 'fDu', 'fAu'].forEach(id => { document.getElementById(id).value = ''; });
+  if (donnees) dessiner();
+}
+
+function lignesModifiees() {
+  const parNum = {};
+  donnees.lignes.forEach((l, i) => { parNum[donnees.numeros[i]] = l; });
+  return Object.keys(edits).filter(num => {
+    const orig = parNum[num].slice(1, 14);
+    return edits[num].some((v, i) => v !== orig[i]);
+  }).map(num => ({ ligne: Number(num), bl: parNum[num][0], valeurs: edits[num] }));
+}
+
+async function enregistrer() {
+  const modifs = lignesModifiees();
+  if (!modifs.length) { edition = false; edits = {}; boutons(); dessiner(); return; }
+  const btn = document.getElementById('btnEnregistrer');
+  btn.disabled = true;
+  document.getElementById('infos').textContent = 'Enregistrement...';
+  try {
+    await Nova.api('modifier', { modifications: modifs });
+    edition = false;
+    edits = {};
+    await charger();
+  } catch (e) {
+    document.getElementById('infos').textContent = 'Échec de l\'enregistrement : ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+if (Nova.exiger('gestionnaire')) {
+  document.getElementById('btnModifier').onclick = () => { edition = true; boutons(); dessiner(); };
+  document.getElementById('btnAnnuler').onclick = () => { edition = false; edits = {}; boutons(); dessiner(); };
+  document.getElementById('btnEnregistrer').onclick = enregistrer;
+  ['recherche', 'fBon', 'fCommande', 'fClient', 'fDu', 'fAu'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      clearTimeout(minuteur);
+      minuteur = setTimeout(() => { if (donnees) dessiner(); }, 200);
+    });
+  });
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  charger();
+}
+</script>
+</body>
+</html>

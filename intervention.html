@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Bon d'intervention</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Arial, sans-serif; background: var(--bg); margin: 0; padding: 12px; color: var(--ink); }
+  .carte { background: var(--card); max-width: 720px; margin: 0 auto 14px; padding: 16px; border-radius: 12px; box-shadow: 0 1px 4px var(--ombre); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .numero { color: var(--lien); font-weight: 700; font-size: 18px; }
+  .entete { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .entete img { background: #fff; padding: 4px 8px; border-radius: 8px; max-height: 56px; max-width: 40%; object-fit: contain; }
+  #versions { max-width: 720px; margin: 0 auto 20px; text-align: center; font-size: 11px; color: var(--mute); }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; font-size: 14px; }
+  input, select, textarea { color: var(--ink); width: 100%; padding: 12px; font-size: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  .ligne { display: flex; gap: 8px; }
+  .ligne > div { flex: 1; }
+  .bande { border: 1px dashed var(--line); border-radius: 10px; padding: 10px; margin-top: 10px; position: relative; }
+  .bande .titre { font-weight: 700; font-size: 13px; color: var(--mute); }
+  .suppr { position: absolute; top: 6px; right: 8px; background: none; border: none; color: #d33; font-size: 20px; }
+  button.plus { width: 100%; margin-top: 10px; padding: 12px; font-size: 16px; border: 2px solid var(--lien); color: var(--lien); background: var(--card); border-radius: 8px; font-weight: 700; }
+  canvas { width: 100%; height: 180px; border: 1px solid var(--line); border-radius: 8px; touch-action: none; background: #fff; }
+  button.eff { color: var(--ink); margin-top: 6px; padding: 8px 12px; border: 1px solid var(--line); background: var(--card); border-radius: 8px; }
+  button.valider { width: 100%; padding: 16px; font-size: 18px; font-weight: 700; color: #fff; background: #0b9d58; border: none; border-radius: 10px; }
+  button:disabled { opacity: .5; }
+  #message { text-align: center; margin-top: 10px; font-weight: 600; }
+  #attente { display: none; max-width: 720px; margin: 0 auto 14px; padding: 12px 16px; background: var(--warnbg); border: 1px solid #e0b100; border-radius: 12px; text-align: center; font-weight: 600; }
+  #attente button { margin-top: 8px; padding: 10px 14px; font-size: 15px; font-weight: 700; border: none; border-radius: 8px; background: #e0b100; color: #fff; }
+  #erreurAttente { font-weight: 500; font-size: 13px; color: var(--koink); margin-top: 6px; }
+  #infoHaut { display: none; max-width: 720px; margin: 0 auto 14px; padding: 10px 16px; border-radius: 12px; text-align: center; font-weight: 600; }
+  #infoHaut.ok { background: var(--okbg); color: var(--okink); }
+  #infoHaut.ko { background: var(--kobg); color: var(--koink); }
+  #barre { max-width: 720px; margin: 0 auto 10px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; }
+  #barre a { color: var(--lien); text-decoration: none; font-size: 15px; }
+  .enligne { color: #0b9d58; } .horsligne { color: #d33; }
+  .listeTech { border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; }
+  .listeTech label.tech { display: flex; align-items: center; gap: 12px; font-weight: 500; font-size: 17px; margin: 0; padding: 12px 0; border-bottom: 1px solid var(--line2); }
+  .listeTech label.tech:last-child { border-bottom: none; }
+  .listeTech input[type=checkbox] { width: 26px; height: 26px; padding: 0; flex: none; }
+  .horaire { display: flex; gap: 6px; align-items: center; }
+  .horaire select { flex: 1; min-width: 0; }
+  .horaire span { font-weight: 700; }
+  .erreurTech { color: #d33; font-weight: 600; font-size: 14px; padding: 10px 0; }
+  .erreurTech button { margin-top: 8px; padding: 8px 12px; font-size: 15px; border: 1px solid var(--line); background: var(--card); border-radius: 8px; color: var(--ink); }
+</style>
+</head>
+<body>
+
+<div id="barre"><a id="retour" href="./">← Accueil</a><span id="statutReseau"></span></div>
+<div id="attente">
+  <span id="texteAttente"></span><br>
+  <div id="erreurAttente"></div>
+  <button id="btnRenvoi" onclick="envoyerEnAttente(true)">Renvoyer les bons en attente</button>
+</div>
+<div id="infoHaut"></div>
+
+<div class="carte">
+  <div class="entete">
+    <div>
+      <h1>Bon d'intervention</h1>
+      <div class="numero" id="numero">N° ...</div>
+    </div>
+    <img id="logo" src="data:image/png;base64,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" alt="Novafit">
+  </div>
+  <label>N° de commande</label><input id="numeroCommande" placeholder="N° de commande">
+  <label>Date</label><input id="date" readonly>
+  <div class="ligne">
+    <div><label>Heure d'arrivée</label><div class="horaire"><select id="arriveeH"></select><span>h</span><select id="arriveeM"></select></div></div>
+    <div><label>Heure de fin</label><div class="horaire"><select id="finH"></select><span>h</span><select id="finM"></select></div></div>
+  </div>
+  <label>Nom du client</label><input id="client" placeholder="Nom du client">
+  <label>Techniciens présents</label><div id="techniciens" class="listeTech"></div>
+  <label>Autre technicien (si absent de la liste)</label><input id="autreTechnicien" placeholder="Nom du technicien">
+</div>
+
+<div class="carte">
+  <b>Bandes</b>
+  <div id="bandes"></div>
+  <button class="plus" onclick="ajouterBande()">+ Ajouter une bande</button>
+</div>
+
+<div class="carte">
+  <label>Commentaire</label><textarea id="commentaire" rows="5"></textarea>
+</div>
+
+<div class="carte">
+  <label>Nom du signataire</label><input id="nomSignataire" placeholder="Nom et prénom de la personne qui signe">
+  <label>Signature du client</label>
+  <canvas id="sign"></canvas>
+  <button class="eff" onclick="effacerSignature()">Effacer la signature</button>
+  <label>Email du client (pour recevoir le bon)</label>
+  <input type="email" id="emailClient" placeholder="client@exemple.fr">
+</div>
+
+<div class="carte">
+  <button class="valider" id="btnValider" onclick="valider()">Valider et envoyer</button>
+  <div id="message"></div>
+</div>
+
+<div id="versions"></div>
+
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script>
+const URL_API = (window.CONFIG && window.CONFIG.URL_API) || '';
+function urlApiRenseignee() { return URL_API !== '' && URL_API.indexOf('COLLE_ICI') !== 0; }
+const CLE_ATTENTE = 'bonsEnAttente';
+const CLE_TECHNICIENS = 'techniciensMemorises';
+const VERSION_PAGE = '2026-11-09-c';
+const COMMENTAIRE_SINGULIER = 'Intervention sur site pour la mise en longueur + jonction + réglage bande client. A contrôler en production';
+const COMMENTAIRE_PLURIEL = 'Intervention sur site pour les mises en longueur + jonctions + réglages bandes client. A contrôler en production';
+let commentaireAuto = '';
+const DELAI_MAX_MS = 90000;
+// Ouvert depuis « Commandes en cours » : ?doc=<id du PDF>&cd=<N° de commande>&client=<client>
+const PARAMS = new URLSearchParams(location.search);
+const DOC_ID = PARAMS.get('doc') || '';
+
+function aujourdhui() {
+  return new Date().toLocaleDateString('fr-FR');
+}
+
+function creerErreur(type, message) {
+  const e = new Error(message);
+  e.type = type;
+  return e;
+}
+
+/* ---------- Envoi d'un bon au script Apps Script ---------- */
+async function posterBon(donnees) {
+  if (!urlApiRenseignee()) throw creerErreur('serveur', 'Adresse du script non renseignée : remplis URL_API dans config.js.');
+  const s = Nova.session();
+  if (!s) throw creerErreur('session', 'Connexion requise : ouvre l\'accueil et connecte-toi, puis renvoie le bon.');
+  const ctrl = new AbortController();
+  const minuteur = setTimeout(() => ctrl.abort(), DELAI_MAX_MS);
+  let r;
+  try {
+    r = await fetch(URL_API, { method: 'POST', body: JSON.stringify(Object.assign({}, donnees, { jeton: s.jeton })), signal: ctrl.signal });
+  } catch (e) {
+    throw creerErreur('reseau', 'Le script n\'a pas répondu (réseau coupé, URL incorrecte ou accès non réglé sur « Tout le monde »).');
+  } finally {
+    clearTimeout(minuteur);
+  }
+  let res;
+  try {
+    res = await r.json();
+  } catch (e) {
+    throw creerErreur('serveur', 'Réponse inattendue du script (autorisations à accorder ou nouvelle version à déployer dans Apps Script).');
+  }
+  if (!res.ok) throw creerErreur(res.code === 'session' ? 'session' : 'serveur', res.erreur || 'Erreur du script.');
+  return res;
+}
+
+/* ---------- Stockage hors ligne ---------- */
+function lireAttente() {
+  try { return JSON.parse(localStorage.getItem(CLE_ATTENTE)) || []; }
+  catch (e) { return []; }
+}
+function ecrireAttente(liste) {
+  localStorage.setItem(CLE_ATTENTE, JSON.stringify(liste));
+  afficherAttente();
+}
+function afficherAttente() {
+  const liste = lireAttente();
+  const n = liste.length;
+  document.getElementById('attente').style.display = n > 0 ? 'block' : 'none';
+  document.getElementById('texteAttente').textContent =
+    n + (n > 1 ? ' bons en attente d\'envoi' : ' bon en attente d\'envoi');
+  const erreurs = liste.map(b => b.erreur).filter(Boolean);
+  const derniere = erreurs.length ? erreurs[erreurs.length - 1] : '';
+  document.getElementById('erreurAttente').textContent = derniere ? 'Dernière erreur : ' + derniere : '';
+}
+function afficherStatutReseau() {
+  const el = document.getElementById('statutReseau');
+  if (navigator.onLine) { el.textContent = 'En ligne'; el.className = 'enligne'; }
+  else { el.textContent = 'Hors ligne – les bons seront gardés sur l\'appareil'; el.className = 'horsligne'; }
+}
+function infoHaut(texte, ok) {
+  const el = document.getElementById('infoHaut');
+  el.textContent = texte;
+  el.className = ok ? 'ok' : 'ko';
+  el.style.display = texte ? 'block' : 'none';
+}
+
+/* ---------- Envoi des bons en attente ---------- */
+let envoiEnCours = false;
+async function envoyerEnAttente(manuel) {
+  if (envoiEnCours) return;
+  if (!navigator.onLine) {
+    if (manuel) infoHaut('Toujours hors ligne : le bon reste sur l\'appareil.', false);
+    return;
+  }
+  envoiEnCours = true;
+  const btn = document.getElementById('btnRenvoi');
+  btn.disabled = true;
+  if (manuel) infoHaut('Envoi en cours...', true);
+  let envoyes = 0, avert = '';
+  for (const bon of lireAttente()) {
+    try {
+      const res = await posterBon(bon.donnees);
+      if (res.avertissement) avert = res.avertissement;
+      ecrireAttente(lireAttente().filter(b => b.id !== bon.id));
+      envoyes++;
+    } catch (e) {
+      const liste = lireAttente();
+      const cible = liste.find(b => b.id === bon.id);
+      if (cible) { cible.erreur = e.message; ecrireAttente(liste); }
+      if (manuel) infoHaut('Échec de l\'envoi : ' + e.message, false);
+      break;
+    }
+  }
+  envoiEnCours = false;
+  btn.disabled = false;
+  if (envoyes > 0) {
+    infoHaut(envoyes + (envoyes > 1 ? ' bons envoyés' : ' bon envoyé') + ' !' + (avert ? ' ⚠ ' + avert : ''), true);
+    setTimeout(() => infoHaut('', true), avert ? 20000 : 8000);
+  }
+}
+
+/* ---------- Initialisation ---------- */
+async function init() {
+  document.getElementById('date').value = aujourdhui();
+  if (DOC_ID) {
+    document.getElementById('numeroCommande').value = PARAMS.get('cd') || '';
+    document.getElementById('client').value = PARAMS.get('client') || '';
+    const retour = document.getElementById('retour');
+    retour.href = 'commandes.html';
+    retour.textContent = '← Commandes';
+  }
+  if (!Nova.session()) infoHaut('Connecte-toi depuis l\'accueil : sans connexion, le bon sera gardé sur l\'appareil et ne partira qu\'après connexion.', false);
+  commentaireAuto = COMMENTAIRE_SINGULIER;
+  document.getElementById('commentaire').value = commentaireAuto;
+  remplirHoraires();
+  ajouterBande();
+  afficherAttente();
+  afficherStatutReseau();
+  await chargerDonnees();
+  envoyerEnAttente(false);
+}
+
+async function chargerDonnees() {
+  document.getElementById('techniciens').innerHTML = '<div class="erreurTech" style="color:#555">Chargement...</div>';
+  try {
+    if (!urlApiRenseignee()) throw new Error('Adresse du script non renseignée : remplis URL_API dans config.js.');
+    const r = await fetch(URL_API);
+    const d = await r.json();
+    if (d.erreur) throw new Error(d.erreur);
+    localStorage.setItem(CLE_TECHNICIENS, JSON.stringify(d.techniciens));
+    document.getElementById('numero').textContent = 'N° ' + d.numero;
+    afficherVersions(d.version || 'ancienne version (à redéployer)');
+    remplirTechniciens(d.techniciens);
+  } catch (e) {
+    afficherVersions('injoignable');
+    let memo = [];
+    try { memo = JSON.parse(localStorage.getItem(CLE_TECHNICIENS) || '[]'); } catch (x) {}
+    document.getElementById('numero').textContent = 'N° attribué à l\'envoi';
+    if (memo.length > 0) remplirTechniciens(memo);
+    else afficherErreurTech(e);
+  }
+}
+
+function afficherVersions(versionScript) {
+  document.getElementById('versions').textContent = 'Page ' + VERSION_PAGE + ' · Script ' + versionScript;
+}
+
+function afficherErreurTech(e) {
+  const brut = e instanceof TypeError || e instanceof SyntaxError || !e || !e.message;
+  const detail = brut
+    ? 'Impossible de joindre le script Apps Script. Vérifie l\'URL (elle doit finir par /exec) et que l\'accès du déploiement est sur « Tout le monde ».'
+    : e.message;
+  document.getElementById('techniciens').innerHTML =
+    '<div class="erreurTech"><div>Liste des techniciens non chargée.</div><div id="detailErreur"></div>' +
+    '<button onclick="chargerDonnees()">Réessayer</button></div>';
+  document.getElementById('detailErreur').textContent = detail;
+}
+
+function remplirTechniciens(liste) {
+  const zone = document.getElementById('techniciens');
+  if (!liste || liste.length === 0) {
+    zone.innerHTML = '<div class="erreurTech">Aucun technicien trouvé (noms attendus en colonne A, à partir de la ligne 2).</div>';
+    return;
+  }
+  zone.innerHTML = liste.map(t => {
+    const nom = String(t);
+    return '<label class="tech"><input type="checkbox" value="' + nom.replace(/"/g, '&quot;') + '"><span>' + nom + '</span></label>';
+  }).join('');
+}
+
+/* ---------- Heures (pas de 15 minutes) ---------- */
+function remplirHoraires() {
+  ['arrivee', 'fin'].forEach(p => {
+    const h = document.getElementById(p + 'H');
+    const m = document.getElementById(p + 'M');
+    let opts = '<option value="">--</option>';
+    for (let i = 0; i < 24; i++) {
+      const v = String(i).padStart(2, '0');
+      opts += '<option value="' + v + '">' + v + '</option>';
+    }
+    h.innerHTML = opts;
+    m.innerHTML = ['00', '15', '30', '45'].map(v => '<option value="' + v + '">' + v + '</option>').join('');
+  });
+}
+function lireHoraire(p) {
+  const h = document.getElementById(p + 'H').value;
+  return h ? h + ':' + document.getElementById(p + 'M').value : '';
+}
+
+/* ---------- Bandes ---------- */
+function ajouterBande() {
+  const div = document.createElement('div');
+  div.className = 'bande';
+  div.innerHTML =
+    '<div class="titre"></div><button class="suppr" onclick="supprimerBande(this)">×</button>' +
+    '<label>Matière</label><input class="matiere">' +
+    '<div class="ligne"><div><label>Largeur</label><input class="largeur"></div>' +
+    '<div><label>Longueur</label><input class="longueur"></div></div>' +
+    '<label>Commentaire</label><textarea class="commentaireBande" rows="2"></textarea>';
+  document.getElementById('bandes').appendChild(div);
+  renumeroter();
+}
+
+function supprimerBande(btn) {
+  if (document.querySelectorAll('.bande').length > 1) {
+    btn.parentElement.remove();
+    renumeroter();
+  }
+}
+
+function renumeroter() {
+  document.querySelectorAll('.bande .titre').forEach((t, i) => t.textContent = 'Bande ' + (i + 1));
+  majCommentaireAuto();
+}
+
+/* Commentaire prérempli : pluriel dès 2 bandes, tant que tu ne l'as pas modifié à la main */
+function majCommentaireAuto() {
+  const zone = document.getElementById('commentaire');
+  const voulu = document.querySelectorAll('.bande').length > 1 ? COMMENTAIRE_PLURIEL : COMMENTAIRE_SINGULIER;
+  if (zone.value === commentaireAuto) {
+    zone.value = voulu;
+    commentaireAuto = voulu;
+  }
+}
+
+/* ---------- Signature ---------- */
+const canvas = document.getElementById('sign');
+const ctx = canvas.getContext('2d');
+let dessine = false, aSigne = false;
+
+function ajusterCanvas() {
+  const r = canvas.getBoundingClientRect();
+  canvas.width = r.width * 2; canvas.height = r.height * 2;
+  ctx.scale(2, 2); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = '#000';
+}
+function pos(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+canvas.addEventListener('pointerdown', e => { dessine = true; aSigne = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+canvas.addEventListener('pointermove', e => { if (!dessine) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+window.addEventListener('pointerup', () => dessine = false);
+function effacerSignature() { ctx.clearRect(0, 0, canvas.width, canvas.height); aSigne = false; }
+
+/* ---------- Validation ---------- */
+async function valider() {
+  const msg = document.getElementById('message');
+  const client = document.getElementById('client').value.trim();
+  const nomSignataire = document.getElementById('nomSignataire').value.trim();
+  const coches = [...document.querySelectorAll('#techniciens input:checked')].map(c => c.value);
+  const autreTech = document.getElementById('autreTechnicien').value.trim();
+  const technicien = (autreTech ? coches.concat(autreTech) : coches).join(', ');
+  const emailClient = document.getElementById('emailClient').value.trim();
+  if (!client || !technicien || !emailClient) { msg.textContent = 'Client, au moins un technicien et email sont obligatoires.'; return; }
+  if (!nomSignataire) { msg.textContent = 'Le nom du signataire est obligatoire.'; return; }
+  if (!aSigne) { msg.textContent = 'La signature du client est obligatoire.'; return; }
+
+  const bandes = [...document.querySelectorAll('.bande')].map(b => ({
+    matiere: b.querySelector('.matiere').value,
+    largeur: b.querySelector('.largeur').value,
+    longueur: b.querySelector('.longueur').value,
+    commentaire: b.querySelector('.commentaireBande').value
+  }));
+
+  const donnees = {
+    idEnvoi: 'B' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+    date: aujourdhui(), client, nomSignataire, technicien, emailClient, bandes,
+    numeroCommande: document.getElementById('numeroCommande').value.trim(),
+    commentaire: document.getElementById('commentaire').value,
+    heureArrivee: lireHoraire('arrivee'),
+    heureFin: lireHoraire('fin'),
+    signature: canvas.toDataURL('image/png'),
+    docId: DOC_ID
+  };
+
+  const btn = document.getElementById('btnValider');
+  btn.disabled = true; msg.textContent = 'Envoi en cours...';
+
+  if (!navigator.onLine) { garderEnAttente(donnees, 'Pas de connexion Internet.'); return; }
+
+  try {
+    const res = await posterBon(donnees);
+    msg.textContent = 'Bon ' + res.numero + ' envoyé !' + (res.avertissement ? ' ⚠ ' + res.avertissement : '');
+    setTimeout(() => { if (DOC_ID) location.href = 'commandes.html'; else location.reload(); }, res.avertissement ? 9000 : 2500);
+  } catch (e) {
+    garderEnAttente(donnees, e.message);
+  }
+}
+
+function garderEnAttente(donnees, raison) {
+  const liste = lireAttente();
+  liste.push({ id: donnees.idEnvoi, donnees: donnees, erreur: raison || '' });
+  try {
+    ecrireAttente(liste);
+  } catch (e) {
+    document.getElementById('message').textContent = 'Mémoire pleine : impossible de garder le bon. Envoie-le dès que possible.';
+    document.getElementById('btnValider').disabled = false;
+    return;
+  }
+  document.getElementById('message').textContent =
+    'Envoi impossible pour le moment : bon gardé sur l\'appareil. ' + (raison || '');
+  setTimeout(() => { if (DOC_ID) location.href = 'commandes.html'; else location.reload(); }, 6000);
+}
+
+/* ---------- Événements réseau ---------- */
+window.addEventListener('online', () => { afficherStatutReseau(); envoyerEnAttente(false); });
+window.addEventListener('offline', afficherStatutReseau);
+
+window.addEventListener('load', () => { ajusterCanvas(); init(); });
+</script>
+</body>
+</html>
