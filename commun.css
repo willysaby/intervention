@@ -36,12 +36,12 @@ h1 { margin: 0; font-size: 20px; }
 .filtres label { display: block; font-size: 12px; font-weight: 600; color: var(--mute); margin-bottom: 3px; }
 .tableau { overflow: auto; max-height: calc(100vh - 230px); background: var(--card); border-radius: 10px; box-shadow: 0 1px 4px var(--ombre); }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
-th { position: sticky; top: 0; background: var(--vert); color: #fff; text-align: left; padding: 8px 10px; white-space: nowrap; z-index: 1; }
-td { padding: 7px 10px; border-bottom: 1px solid var(--line2); vertical-align: top; max-width: 320px; }
+th { position: sticky; top: 0; background: var(--vert); color: #fff; text-align: center; padding: 8px 10px; white-space: nowrap; z-index: 1; }
+td { text-align: center; vertical-align: middle; padding: 7px 10px; border-bottom: 1px solid var(--line2); vertical-align: top; max-width: 320px; }
 tr.g1 td { background: var(--card); }
 tr.g2 td { background: var(--g2); }
 tr.debut td { border-top: 2px solid var(--g2b); }
-td input { width: 100%; min-width: 90px; padding: 6px 8px; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; }
+td input { text-align: center; width: 100%; min-width: 90px; padding: 6px 8px; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; }
 tr.modifie td { background: var(--editbg); }
 .lecture { display: inline-block; background: var(--pastille); color: var(--mute); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; margin-left: 8px; vertical-align: middle; }
 .lecture.edition { background: var(--abg); color: var(--aink); }
