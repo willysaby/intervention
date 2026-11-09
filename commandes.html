@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Commandes en cours</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="commun.css">
+</head>
+<body>
+<div class="page" id="page">
+  <div class="haut">
+    <a href="./">← Accueil</a>
+    <h1>Commandes en cours</h1>
+    <button class="btn" id="btnActualiser" type="button">Actualiser</button>
+  </div>
+  <input class="champ" id="recherche" type="search" placeholder="Rechercher (N° de commande, client)">
+  <div id="infos"></div>
+  <div class="liste" id="liste"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script>
+const CLE_CACHE = 'commandesCache';
+let commandes = [];
+// Si le script n'est pas à jour, le client est repris du nom du fichier (« CD26xxxx - Client »)
+function corrigerClient(c) {
+  if (c.client) return c;
+  const m = String(c.nom || '').replace(/\.pdf$/i, '').match(/^([^-–—]+?)\s*[-–—]\s*(.+)$/);
+  return m ? Object.assign({}, c, { cd: m[1].trim(), client: m[2].trim() }) : c;
+}
+
+function enAttente() {
+  // Commandes dont le bon est gardé sur l'appareil en attendant le réseau
+  try { return (JSON.parse(localStorage.getItem('bonsEnAttente')) || []).map(b => b.donnees && b.donnees.docId).filter(Boolean); }
+  catch (e) { return []; }
+}
+
+function dessiner(horsLigne) {
+  const filtre = Nova.norm(document.getElementById('recherche').value.trim());
+  const attente = enAttente();
+  const liste = document.getElementById('liste');
+  liste.innerHTML = '';
+  let n = 0;
+  commandes.forEach(c => {
+    if (filtre && Nova.norm(c.cd + ' ' + c.client + ' ' + c.nom).indexOf(filtre) < 0) return;
+    n++;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'item';
+    const t = document.createElement('b');
+    t.textContent = c.cd || c.nom;
+    b.appendChild(t);
+    if (c.client) {
+      const s = document.createElement('small');
+      s.textContent = c.client;
+      b.appendChild(s);
+    }
+    if (attente.indexOf(c.id) >= 0) {
+      const a = document.createElement('span');
+      a.className = 'attente';
+      a.textContent = 'Bon en attente d\'envoi';
+      b.appendChild(a);
+    }
+    b.onclick = () => ouvrir(c);
+    liste.appendChild(b);
+  });
+  let texte = n + (n > 1 ? ' commandes' : ' commande');
+  if (!commandes.length) texte = 'Aucune commande en cours.';
+  else if (!n) texte = 'Aucun résultat.';
+  if (horsLigne) texte += ' · liste enregistrée sur l\'appareil (hors ligne)';
+  document.getElementById('infos').textContent = texte;
+}
+
+function ouvrir(c) {
+  const url = 'intervention.html?doc=' + encodeURIComponent(c.id) + '&cd=' + encodeURIComponent(c.cd) + '&client=' + encodeURIComponent(c.client);
+  Nova.ouvrirVisio({
+    id: c.id,
+    titre: (c.cd ? c.cd : '') + (c.client ? ' · ' + c.client : ''),
+    action: { texte: 'Faire le bon d\'intervention', fn: () => { location.href = url; } }
+  });
+}
+
+async function charger() {
+  const infos = document.getElementById('infos');
+  infos.textContent = 'Chargement...';
+  try {
+    const res = await Nova.api('commandes');
+    commandes = res.commandes.map(corrigerClient);
+    try { localStorage.setItem(CLE_CACHE, JSON.stringify(commandes)); } catch (e) {}
+    dessiner(false);
+  } catch (e) {
+    if (e.code === 'reseau') {
+      try {
+        const memo = JSON.parse(localStorage.getItem(CLE_CACHE));
+        if (Array.isArray(memo)) { commandes = memo.map(corrigerClient); dessiner(true); return; }
+      } catch (x) {}
+    }
+    infos.textContent = '';
+    const boite = document.createElement('div');
+    boite.className = 'erreurPage';
+    boite.textContent = e.message;
+    document.getElementById('liste').innerHTML = '';
+    document.getElementById('liste').appendChild(boite);
+  }
+}
+
+if (Nova.exiger('technicien')) {
+  document.getElementById('btnActualiser').onclick = charger;
+  document.getElementById('recherche').addEventListener('input', () => dessiner(false));
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  charger();
+}
+</script>
+<script src="shell.js"></script>
+</body>
+</html>
