@@ -1,5 +1,5 @@
 // Service worker : réseau d'abord (pages toujours à jour), copie en mémoire si pas de réseau.
-const CACHE = 'novafit-v12';
+const CACHE = 'novafit-v13';
 const FICHIERS = ['./', 'index.html', 'intervention.html', 'jonction.html', 'commandes.html', 'termines.html',
   'commun.js', 'commun.css', 'theme.js', 'theme.css', 'shell.js', 'shell.css', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 

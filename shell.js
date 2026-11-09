@@ -55,7 +55,7 @@
 
     {
       const h = document.createElement('div');
-      h.className = 'entete';
+      h.className = 'enteteApp';
       h.innerHTML =
         '<div class="enteteLogo"><img src="icon-192.png" alt=""></div>' +
         '<div class="enteteTitres"><b>Novafit</b><span id="enteteSous"></span></div>' +
