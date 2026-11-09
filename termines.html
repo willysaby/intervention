@@ -42,6 +42,9 @@
 <script src="commun.js"></script>
 <script>
 const CLE_CACHE = 'termineCache';
+// Titres fixes des 14 colonnes (indépendants de la ligne 1 du Sheet)
+const NOMS_COLONNES = ['N° de BL', 'N° de commande', 'Date d\'intervention', 'Client', 'Email client', 'Nom du signataire', 'Technicien',
+  'Matière', 'Largeur', 'Longueur', 'Commentaire (bande)', 'Commentaire intervention', 'Heure d\'arrivée', 'Heure de fin'];
 const LIMITE_EDITION = 50;
 let donnees = null, horsLigne = false, edition = false, edits = {}, minuteur = null;
 
@@ -135,7 +138,7 @@ function dessiner() {
   const table = document.createElement('table');
   const thead = document.createElement('thead');
   const tr = document.createElement('tr');
-  ['Document'].concat(donnees.entetes).forEach(t => {
+  ['Document'].concat(NOMS_COLONNES.concat(donnees.entetes.slice(NOMS_COLONNES.length))).forEach(t => {
     const th = document.createElement('th');
     th.textContent = t;
     tr.appendChild(th);
@@ -155,15 +158,22 @@ function dessiner() {
       const ligne = document.createElement('tr');
       ligne.className = (parite ? 'g1' : 'g2') + (i === 0 ? ' debut' : '') + (edits[x.num] ? ' modifie' : '');
       const tdDoc = document.createElement('td');
-      const idDoc = i === 0 ? donnees.docs[Nova.cleCommande(x.l[1])] : null;
-      if (idDoc) {
+      const docs = [];
+      if (i === 0) {
+        const idCmd = donnees.docs[Nova.cleCommande(x.l[1])];
+        const idBon = (donnees.bons || {})[String(x.l[0]).trim()];
+        if (idCmd) docs.push({ id: idCmd, texte: 'Commande', titre: 'Commande ' + x.l[1] + (x.l[3] ? ' · ' + x.l[3] : '') });
+        if (idBon) docs.push({ id: idBon, texte: 'Bon', titre: 'Bon ' + x.l[0] + (x.l[3] ? ' · ' + x.l[3] : '') });
+      }
+      docs.forEach(dc => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'btn';
-        b.textContent = 'PDF';
-        b.onclick = () => Nova.ouvrirVisio({ id: idDoc, titre: x.l[1] + (x.l[3] ? ' · ' + x.l[3] : '') });
+        b.style.cssText = 'display:block;margin:2px auto;padding:6px 10px;font-size:13px';
+        b.textContent = dc.texte;
+        b.onclick = () => Nova.ouvrirVisio({ id: dc.id, titre: dc.titre });
         tdDoc.appendChild(b);
-      }
+      });
       ligne.appendChild(tdDoc);
       x.l.forEach((v, col) => {
         const td = document.createElement('td');

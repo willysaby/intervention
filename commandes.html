@@ -33,7 +33,8 @@ let commandes = [];
 // Si le script n'est pas à jour, le client est repris du nom du fichier (« CD26xxxx - Client »)
 function corrigerClient(c) {
   if (c.client) return c;
-  const m = String(c.nom || '').replace(/\.pdf$/i, '').match(/^([^-–—]+?)\s*[-–—]\s*(.+)$/);
+  const base = String(c.nom || '').replace(/\.pdf$/i, '');
+  const m = base.match(/^(.+?)\s+[-–—]\s+(.+)$/) || base.match(/^([^-–—]+?)\s*[-–—]\s*(.+)$/);
   return m ? Object.assign({}, c, { cd: m[1].trim(), client: m[2].trim() }) : c;
 }
 
