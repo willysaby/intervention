@@ -23,9 +23,9 @@
     return null;
   }
   const ONGLETS = [
-    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', min: null, fichiers: ['', 'index.html'] },
     { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', min: 'technicien', fichiers: ['jonction.html'] },
     { id: 'bon', lib: 'Vierge', href: 'intervention.html', ic: 'plus', min: 'technicien', fichiers: ['intervention.html'] },
+    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', min: null, fichiers: ['', 'index.html'] },
     { id: 'commandes', lib: 'Commande', href: 'commandes.html', ic: 'list', min: 'technicien', fichiers: ['commandes.html'] },
     { id: 'finies', lib: 'Finies', href: 'termines.html', ic: 'check', min: 'gestionnaire', fichiers: ['termines.html'] }
   ];
@@ -35,7 +35,7 @@
   function fichierCourant() { return decodeURIComponent(location.pathname.split('/').pop()); }
   function ongletActif() {
     const f = fichierCourant();
-    let id = (ONGLETS.find(o => o.fichiers.indexOf(f) >= 0) || ONGLETS[0]).id;
+    let id = (ONGLETS.find(o => o.fichiers.indexOf(f) >= 0) || ONGLETS.find(function (o) { return o.id === 'accueil'; })).id;
     // Un bon ouvert depuis une commande reste dans l'onglet Commandes
     if (id === 'bon' && new URLSearchParams(location.search).get('doc')) id = 'commandes';
     return id;
@@ -48,11 +48,11 @@
 
   function construire() {
     const actif = ongletActif();
-    document.body.classList.add('avecBarre');
+    if (actif !== 'jonction') document.body.classList.add('avecBarre');
     if (actif !== 'jonction') document.body.classList.add('avecEntete');
     const s = session();
 
-    if (actif !== 'jonction') {
+    {
       const h = document.createElement('div');
       h.className = 'entete';
       h.innerHTML =
@@ -69,6 +69,7 @@
       maj();
     }
 
+    if (actif === 'jonction') return; // Jonction garde son propre bandeau (avec un bouton Accueil)
     const nav = document.createElement('nav');
     nav.className = 'barreOnglets';
     ONGLETS.forEach(function (o) {

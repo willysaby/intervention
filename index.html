@@ -21,17 +21,17 @@
   .badge.technicien { background: var(--tbg); color: var(--tink); }
   .badge.gestionnaire { background: var(--gbg); color: var(--gink); }
   .badge.admin { background: var(--abg); color: var(--aink); }
-  .grille { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; min-height: 118px; }
   .kpi b { display: block; font-size: 42px; line-height: 1.1; }
   .kpi span { display: block; margin-top: 6px; color: var(--mute); font-size: 16px; }
   .kpi.alerte { background: var(--warnbg); border-color: #e0b100; cursor: pointer; }
   .kpi.alerte b, .kpi.alerte span { color: var(--warnink); }
   .kpi.alerte span.aide { font-weight: 700; font-size: 14px; margin-top: 4px; }
-  a.action { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; color: var(--ink); text-decoration: none; min-height: 150px; }
+  a.action { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 16px 14px; color: var(--ink); text-decoration: none; min-height: 150px; }
   a.action.vedette { border: 2px solid var(--lien); }
   a.action .puce { width: 52px; height: 52px; border-radius: 16px; background: var(--accentbg); color: var(--lien); display: grid; place-items: center; margin-bottom: 14px; }
-  a.action b { display: block; font-size: 20px; }
+  a.action b { display: block; font-size: 16px; overflow-wrap: break-word; }
   a.action span.d { display: block; margin-top: 4px; color: var(--mute); font-size: 15px; }
   a.action.ferme { opacity: .5; pointer-events: none; }
   .carte { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 14px; }
@@ -41,6 +41,7 @@
   button.secondaire { width: 100%; padding: 12px; font-size: 15px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; color: var(--ink); }
   button:disabled { opacity: .55; }
   #message { margin-top: 8px; font-weight: 600; font-size: 14px; color: var(--koink); min-height: 1em; }
+  @media (min-width: 900px) { .page { max-width: 1040px; } .grille { grid-template-columns: repeat(4, minmax(0, 1fr)); } #connexion { max-width: 420px; } }
   #consigne { color: var(--mute); font-size: 15px; margin: 0 0 12px; }
 </style>
 </head>
