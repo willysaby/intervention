@@ -10,6 +10,7 @@
     refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     moon: '<path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
   };
   function svg(nom, taille) {
@@ -69,7 +70,10 @@
       maj();
     }
 
-    if (actif === 'jonction') return; // Jonction garde son propre bandeau (avec un bouton Accueil)
+    if (actif === 'jonction') { // Jonction garde son propre bandeau (mêmes icônes, bouton Accueil au centre)
+      document.querySelectorAll('[data-ic]').forEach(function (e) { e.innerHTML = svg(e.getAttribute('data-ic'), 22); });
+      return;
+    }
     const nav = document.createElement('nav');
     nav.className = 'barreOnglets';
     ONGLETS.forEach(function (o) {

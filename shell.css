@@ -9,9 +9,9 @@ body.avecBarre { padding-bottom: calc(84px + env(safe-area-inset-bottom)) !impor
 .enteteTitres span { display: block; font-size: 13px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .enteteBtn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--ink); display: grid; place-items: center; padding: 0; flex: none; }
 .barreOnglets { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; gap: 2px; padding: 8px 4px calc(8px + env(safe-area-inset-bottom)); background-color: var(--entete, #111c18); border-top: 1px solid var(--line); justify-content: center; }
-.barreOnglets a { flex: 1 1 0; max-width: 150px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 0; border-radius: 14px; color: var(--mute); text-decoration: none; font-size: 11px; font-weight: 600; min-width: 0; }
-.barreOnglets a span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.barreOnglets a.on { background: var(--accentbg); color: var(--lien); }
+.barreOnglets a, .barreOnglets button { line-height: 1.2; justify-content: center; min-height: 58px; flex: 1 1 0; max-width: 150px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 0; border-radius: 14px; color: var(--mute); text-decoration: none; font-size: 11px; background: none; border: 0; font-family: inherit; cursor: pointer; font-weight: 600; min-width: 0; }
+.barreOnglets a span, .barreOnglets button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.barreOnglets a.on, .barreOnglets button.on { background: var(--accentbg); color: var(--lien); }
 .barreOnglets a.ferme { opacity: .45; }
 /* Cartes */
 .item, .carte, .tableau, .erreurPage { border: 1px solid var(--line); border-radius: 16px; }
