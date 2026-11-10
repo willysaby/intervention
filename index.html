@@ -30,7 +30,7 @@
   .kpi.alerte { background: var(--warnbg); border-color: #e0b100; cursor: pointer; }
   .kpi.alerte b, .kpi.alerte span { color: var(--warnink); }
   .kpi.alerte span.aide { font-weight: 700; font-size: 14px; margin-top: 4px; }
-  a.action { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 16px 14px; color: var(--ink); text-decoration: none; min-height: 150px; }
+  a.action { order: 10; display: block; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 16px 14px; color: var(--ink); text-decoration: none; min-height: 150px; }
   a.action.vedette { border: 2px solid var(--lien); }
   a.action .puce { width: 52px; height: 52px; border-radius: 16px; background: var(--accentbg); color: var(--lien); display: grid; place-items: center; margin-bottom: 14px; }
   a.action b { display: block; font-size: 16px; overflow-wrap: break-word; }
@@ -78,12 +78,10 @@
     <section class="section" id="secNc" hidden>
       <h2>Non-conformités</h2>
       <div class="grille" id="gridNc"></div>
-      <div class="grille" id="modules_nc"></div>
     </section>
     <section class="section" id="secAch" hidden>
       <h2>Achats</h2>
       <div class="grille" id="gridAch"></div>
-      <div class="grille" id="modules_achats"></div>
     </section>
   </div>
 
@@ -221,7 +219,8 @@ function dessiner() {
   const gest = !!niveau && RANG[niveau] >= RANG.gestionnaire;
   document.getElementById('secNc').hidden = !gest;
   document.getElementById('secAch').hidden = !gest;
-  ['inter', 'nc', 'achats'].forEach(g => { document.getElementById('modules_' + g).innerHTML = ''; });
+  document.getElementById('modules_inter').innerHTML = '';
+  document.querySelectorAll('#gridNc a.action, #gridAch a.action').forEach(a => a.remove());
   MODULES.forEach(m => {
     const autorise = !!niveau && RANG[niveau] >= RANG[m.niveauMin || 'technicien'];
     if (m.masque && !autorise) return;   // invisible pour les niveaux insuffisants (au lieu d'un cadenas)
@@ -231,7 +230,7 @@ function dessiner() {
     a.innerHTML = '<div class="puce">' + Shell.svg(autorise ? m.icone : 'lock', 26) + '</div><b></b><span class="d"></span>';
     a.querySelector('b').textContent = m.titre;
     a.querySelector('.d').textContent = m.description;
-    document.getElementById('modules_' + (m.groupe || 'inter')).appendChild(a);
+    document.getElementById({ nc: 'gridNc', achats: 'gridAch' }[m.groupe] || 'modules_inter').appendChild(a);
   });
   if (niveau) chargerIndicateurs(); else { retirerCartesNc(); retirerCarteAchats(); }
 }
