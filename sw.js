@@ -1,12 +1,15 @@
-// Service worker : réseau d'abord (pages toujours à jour), copie en mémoire si pas de réseau.
-const CACHE = 'novafit-v16';
-const FICHIERS = ['./', 'index.html', 'intervention.html', 'jonction.html', 'commandes.html', 'termines.html',
+// Service worker : copie locale d'abord (ouverture instantanée même avec un réseau très faible),
+// mise à jour en arrière-plan. Les nouvelles versions sont donc prises en compte à l'ouverture suivante.
+const CACHE = 'novafit-v20';
+const FICHIERS = ['./', 'index.html', 'intervention.html', 'jonction.html', 'commandes.html', 'termines.html', 'nc.html', 'nc-ajout.html', 'achats.html', 'achat-nouveau.html',
   'commun.js', 'commun.css', 'theme.js', 'theme.css', 'shell.js', 'shell.css', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/';
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => Promise.all(FICHIERS.map(f => c.add(f).catch(() => {}))))
+      .then(c => Promise.all(FICHIERS.map(f =>
+        fetch(f, { cache: 'reload' }).then(r => { if (r && r.ok) return c.put(f, r); }).catch(() => {}))))
       .then(() => self.skipWaiting())
   );
 });
@@ -19,13 +22,23 @@ self.addEventListener('activate', e => {
   );
 });
 
-function reseauAvecDelai(req, ms) {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('delai')), ms);
-    fetch(req, { cache: 'no-cache' }).then(
-      r => { clearTimeout(t); resolve(r); },
-      err => { clearTimeout(t); reject(err); }
-    );
+// Renvoie la copie locale tout de suite si elle existe ; sinon attend le réseau (8 s maximum).
+// Dans tous les cas, la copie est rafraîchie en arrière-plan quand le réseau répond.
+function copieLocaleOuReseau(e, req, ignoreSearch) {
+  const maj = fetch(req, { cache: 'no-cache' }).then(rep => {
+    if (rep && (rep.ok || rep.type === 'opaque')) {
+      const copie = rep.clone();
+      caches.open(CACHE).then(c => c.put(req, copie));
+    }
+    return rep;
+  });
+  e.waitUntil(maj.catch(() => {}));
+  return caches.match(req, { ignoreSearch: !!ignoreSearch }).then(rep => {
+    if (rep) return rep;
+    return Promise.race([
+      maj,
+      new Promise((_, rejet) => setTimeout(() => rejet(new Error('delai')), 8000))
+    ]).catch(() => Response.error());
   });
 }
 
@@ -33,16 +46,10 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // les appels Apps Script et pdf.js ne sont pas interceptés
-  e.respondWith(
-    reseauAvecDelai(req, 5000)
-      .then(rep => {
-        if (rep && rep.ok) {
-          const copie = rep.clone();
-          caches.open(CACHE).then(c => c.put(req, copie));
-        }
-        return rep;
-      })
-      .catch(() => caches.match(req, { ignoreSearch: true }).then(rep => rep || Response.error()))
-  );
+  if (url.origin === self.location.origin) {
+    e.respondWith(copieLocaleOuReseau(e, req, true));
+  } else if (req.url.indexOf(PDFJS) === 0) {
+    e.respondWith(copieLocaleOuReseau(e, req, false));   // lecteur de PDF : gardé après la première utilisation
+  }
+  // les appels Apps Script ne sont pas interceptés
 });

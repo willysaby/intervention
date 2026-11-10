@@ -25,6 +25,8 @@
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; min-height: 118px; }
   .kpi b { display: block; font-size: 42px; line-height: 1.1; }
   .kpi span { display: block; margin-top: 6px; color: var(--mute); font-size: 16px; }
+  .kpi.cliquable { cursor: pointer; }
+  .kpi .sub { font-size: 13px; margin-top: 2px; }
   .kpi.alerte { background: var(--warnbg); border-color: #e0b100; cursor: pointer; }
   .kpi.alerte b, .kpi.alerte span { color: var(--warnink); }
   .kpi.alerte span.aide { font-weight: 700; font-size: 14px; margin-top: 4px; }
@@ -42,12 +44,20 @@
   button:disabled { opacity: .55; }
   #message { margin-top: 8px; font-weight: 600; font-size: 14px; color: var(--koink); min-height: 1em; }
   @media (min-width: 900px) { .page { max-width: 1040px; } .grille { grid-template-columns: repeat(4, minmax(0, 1fr)); } #connexion { max-width: 420px; } }
+  .flash { border-radius: 14px; padding: 14px 16px; margin: 0 0 14px; font-weight: 700; font-size: 16px; }
+  .flash.ok { background: var(--okbg); color: var(--okink); }
+  .flash.attente { background: var(--warnbg); color: var(--warnink); }
+  .section { margin: 22px 0 6px; }
+  .section h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
+  .section h2::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .kpi.achat b small { font-size: 16px; font-weight: 600; color: var(--mute); }
   #consigne { color: var(--mute); font-size: 15px; margin: 0 0 12px; }
 </style>
 </head>
 <body>
 <div class="page">
   <p class="sous" id="sousSalut" style="margin-top:16px">Voici l'état des interventions Novafit.</p>
+  <div class="flash" id="flash" role="status" hidden></div>
   <span class="badge" id="badge">Non connecté</span>
 
   <p id="consigne">Saisis le mot de passe pour activer les applications.</p>
@@ -59,8 +69,23 @@
     <div id="message"></div>
   </form>
 
-  <div class="grille" id="indicateurs" hidden></div>
-  <div class="grille" id="modules"></div>
+  <div id="contenu" hidden>
+    <section class="section" id="secInter">
+      <h2>Bons d'intervention</h2>
+      <div class="grille" id="indicateurs"></div>
+      <div class="grille" id="modules_inter"></div>
+    </section>
+    <section class="section" id="secNc" hidden>
+      <h2>Non-conformités</h2>
+      <div class="grille" id="gridNc"></div>
+      <div class="grille" id="modules_nc"></div>
+    </section>
+    <section class="section" id="secAch" hidden>
+      <h2>Achats</h2>
+      <div class="grille" id="gridAch"></div>
+      <div class="grille" id="modules_achats"></div>
+    </section>
+  </div>
 
   <button class="secondaire" id="deconnexion" onclick="deconnecter()" hidden>Se déconnecter</button>
 </div>
@@ -79,10 +104,12 @@ const RANG = { technicien: 1, gestionnaire: 2, admin: 3 };
 // Boutons de l'accueil. Pour en ajouter un : copier une ligne.
 // niveauMin : 'technicien' (tout le monde), 'gestionnaire' ou 'admin' (ce niveau et ceux au-dessus)
 const MODULES = [
-  { titre: 'Bon d\'intervention vierge', description: 'Saisie d\'un bon sans commande', fichier: 'intervention.html', niveauMin: 'technicien', icone: 'plus' },
-  { titre: 'Bon d\'intervention de commande', description: 'Choisir une commande en cours', fichier: 'commandes.html', niveauMin: 'technicien', icone: 'list', vedette: true },
-  { titre: 'Interventions finies', description: 'Bons réalisés et PDF des commandes', fichier: 'termines.html', niveauMin: 'gestionnaire', icone: 'check' },
-  { titre: 'Jonction', description: 'Paramètres de jonction', fichier: 'jonction.html', niveauMin: 'technicien', icone: 'sliders' }
+  { titre: 'Bon d\'intervention vierge', description: 'Saisie d\'un bon sans commande', fichier: 'intervention.html', niveauMin: 'technicien', icone: 'plus', groupe: 'inter' },
+  { titre: 'Bon d\'intervention de commande', description: 'Choisir une commande en cours', fichier: 'commandes.html', niveauMin: 'technicien', icone: 'list', vedette: true, groupe: 'inter' },
+  { titre: 'Ajouter une NC', description: 'Non-conformité : commande, fournisseur, fabrication', fichier: 'nc-ajout.html', niveauMin: 'gestionnaire', icone: 'alert', masque: true, groupe: 'nc' },
+  { titre: 'Nouvelle commande', description: 'Commande fournisseur : PDF et mail', fichier: 'achat-nouveau.html', niveauMin: 'gestionnaire', icone: 'cart', masque: true, groupe: 'achats' },
+  { titre: 'Interventions finies', description: 'Bons réalisés et PDF des commandes', fichier: 'termines.html', niveauMin: 'gestionnaire', icone: 'check', groupe: 'inter' },
+  { titre: 'Jonction', description: 'Paramètres de jonction', fichier: 'jonction.html', niveauMin: 'technicien', icone: 'sliders', groupe: 'inter' }
 ];
 
 let niveau = null;
@@ -136,7 +163,7 @@ function partagerAvecJonction(mdp, n) {
 }
 function oublierJonction() {
   try {
-    ['code', 'admin', 'cache', 'commandesCache', 'termineCache'].forEach(k => localStorage.removeItem(k));
+    ['code', 'admin', 'cache', 'commandesCache', 'termineCache', 'achatsCompte_' + new Date().getFullYear()].forEach(k => localStorage.removeItem(k));
   } catch (e) {}
 }
 
@@ -162,7 +189,8 @@ async function connecter(ev) {
       partagerAvecJonction(champ.value, n);
       champ.value = '';
       msg.textContent = '';
-      dessiner();
+      location.reload();   // la barre d'onglets du bas se reconstruit avec le nouveau niveau
+      return;
     } else {
       msg.style.color = 'var(--koink)';
       msg.textContent = (res && res.erreur) ? res.erreur : 'Mot de passe incorrect.';
@@ -178,7 +206,7 @@ function deconnecter() {
   niveau = null;
   effacerSession();
   oublierJonction();
-  dessiner();
+  location.reload();
 }
 
 /* ---------- Affichage ---------- */
@@ -189,20 +217,23 @@ function dessiner() {
   document.getElementById('connexion').hidden = !!niveau;
   document.getElementById('consigne').hidden = !!niveau;
   document.getElementById('deconnexion').hidden = !niveau;
-  document.getElementById('indicateurs').hidden = !niveau;
-  const zone = document.getElementById('modules');
-  zone.innerHTML = '';
+  document.getElementById('contenu').hidden = !niveau;
+  const gest = !!niveau && RANG[niveau] >= RANG.gestionnaire;
+  document.getElementById('secNc').hidden = !gest;
+  document.getElementById('secAch').hidden = !gest;
+  ['inter', 'nc', 'achats'].forEach(g => { document.getElementById('modules_' + g).innerHTML = ''; });
   MODULES.forEach(m => {
     const autorise = !!niveau && RANG[niveau] >= RANG[m.niveauMin || 'technicien'];
+    if (m.masque && !autorise) return;   // invisible pour les niveaux insuffisants (au lieu d'un cadenas)
     const a = document.createElement('a');
     a.className = 'action' + (m.vedette && autorise ? ' vedette' : '') + (autorise ? '' : ' ferme');
     a.href = autorise ? m.fichier : '#';
     a.innerHTML = '<div class="puce">' + Shell.svg(autorise ? m.icone : 'lock', 26) + '</div><b></b><span class="d"></span>';
     a.querySelector('b').textContent = m.titre;
     a.querySelector('.d').textContent = m.description;
-    zone.appendChild(a);
+    document.getElementById('modules_' + (m.groupe || 'inter')).appendChild(a);
   });
-  if (niveau) chargerIndicateurs();
+  if (niveau) chargerIndicateurs(); else { retirerCartesNc(); retirerCarteAchats(); }
 }
 
 /* ---------- Indicateurs ---------- */
@@ -240,7 +271,7 @@ async function renvoyerBons() {
   let envoyes = 0, erreur = '', avert = '';
   for (const bon of lireAttente()) {
     try {
-      const res = await Nova.api('bon', bon.donnees);
+      const res = await Nova.api('bon', bon.donnees, 30000);
       if (res.avertissement) avert = res.avertissement;
       localStorage.setItem('bonsEnAttente', JSON.stringify(lireAttente().filter(b => b.id !== bon.id)));
       envoyes++;
@@ -262,19 +293,111 @@ async function renvoyerBons() {
 async function chargerCommandes() {
   const c = carte('kCmd');
   c.querySelector('.lib').textContent = 'Interventions à réaliser';
+  let memo = null;
+  try { memo = JSON.parse(localStorage.getItem('commandesCache')); } catch (e) {}
+  if (Array.isArray(memo)) c.querySelector('b').textContent = memo.length;   // affichage immédiat, mis à jour ensuite
   try {
-    const r = await Nova.api('commandes');
+    const r = await Nova.api('commandes', null, 10000);
     c.querySelector('b').textContent = r.commandes.length;
-  } catch (e) { c.querySelector('b').textContent = '–'; }
+  } catch (e) { if (!Array.isArray(memo)) c.querySelector('b').textContent = '–'; }
+}
+
+/* ---------- Non-conformités (gestionnaire et administrateur) ---------- */
+const NC_CARTES = [
+  { type: 'fournisseur', lib: 'NC fournisseur' },
+  { type: 'fabrication', lib: 'NC fabrication' },
+  { type: 'commande', lib: 'NC commande' }
+];
+function retirerCartesNc() {
+  document.querySelectorAll('#gridNc .kNc').forEach(c => c.remove());
+}
+function carteNc(type, lib, periode) {
+  const id = 'kNc_' + type + '_' + periode;
+  let c = document.getElementById(id);
+  if (!c) {
+    c = document.createElement('div');
+    c.id = id;
+    c.className = 'kpi kNc cliquable';
+    c.setAttribute('role', 'link');
+    c.tabIndex = 0;
+    c.innerHTML = '<b>…</b><span class="lib"></span><span class="sub"></span>';
+    c.querySelector('.lib').textContent = lib;
+    c.querySelector('.sub').textContent = periode === '30' ? '30 derniers jours' : 'Total';
+    const aller = () => { location.href = 'nc.html?type=' + type + (periode === '30' ? '&periode=30' : ''); };
+    c.onclick = aller;
+    c.onkeydown = e => { if (e.key === 'Enter') aller(); };
+    document.getElementById('gridNc').appendChild(c);
+  }
+  return c;
+}
+async function chargerNc() {
+  if (!niveau || RANG[niveau] < RANG.gestionnaire) { retirerCartesNc(); return; }
+  const cartes = {};
+  NC_CARTES.forEach(x => { cartes[x.type] = { total: carteNc(x.type, x.lib, 'tout'), jours: carteNc(x.type, x.lib, '30') }; });
+  try {
+    const r = await Nova.api('ncStats', null, 10000);
+    NC_CARTES.forEach(x => {
+      cartes[x.type].total.querySelector('b').textContent = r.stats[x.type].total;
+      cartes[x.type].jours.querySelector('b').textContent = r.stats[x.type].jours;
+    });
+  } catch (e) {
+    NC_CARTES.forEach(x => { cartes[x.type].total.querySelector('b').textContent = '–'; cartes[x.type].jours.querySelector('b').textContent = '–'; });
+  }
+}
+/* ---------- Achats (gestionnaire et administrateur) ---------- */
+function retirerCarteAchats() {
+  const c = document.getElementById('kAch'); if (c) c.remove();
+}
+async function chargerAchats() {
+  if (!niveau || RANG[niveau] < RANG.gestionnaire) { retirerCarteAchats(); return; }
+  let c = document.getElementById('kAch');
+  if (!c) {
+    c = document.createElement('div');
+    c.id = 'kAch';
+    c.className = 'kpi achat cliquable';
+    c.setAttribute('role', 'link');
+    c.tabIndex = 0;
+    c.innerHTML = '<b>…</b><span class="lib"></span><span class="sub">Appuie pour voir la liste</span>';
+    const aller = () => { location.href = 'achats.html'; };
+    c.onclick = aller;
+    c.onkeydown = e => { if (e.key === 'Enter') aller(); };
+    document.getElementById('gridAch').appendChild(c);
+  }
+  const an = new Date().getFullYear();
+  c.querySelector('.lib').textContent = 'Commandes en ' + an;
+  let memo = null;
+  try { memo = localStorage.getItem('achatsCompte_' + an); } catch (e) {}
+  if (memo !== null) c.querySelector('b').textContent = memo;
+  try {
+    const r = await Nova.api('achatListe', null, 10000);
+    const n = r.lignes.filter(l => String(l.date).slice(0, 4) === String(an)).length;
+    c.querySelector('b').textContent = n;
+    try { localStorage.setItem('achatsCompte_' + an, String(n)); } catch (e) {}
+  } catch (e) { if (memo === null) c.querySelector('b').textContent = '–'; }
 }
 function chargerIndicateurs() {
+  chargerAchats();
   chargerCommandes();
   majAttente();
+  chargerNc();
+}
+
+
+/* ---------- Message laissé par la page du bon (« Envoi validé » / « Bon enregistré ») ---------- */
+function afficherFlash() {
+  let f = null;
+  try { f = JSON.parse(localStorage.getItem('flashAccueil')); localStorage.removeItem('flashAccueil'); } catch (e) {}
+  if (!f || !f.texte || Date.now() - (f.ts || 0) > 120000) return;
+  const el = document.getElementById('flash');
+  el.className = 'flash ' + (f.type === 'ok' ? 'ok' : 'attente');
+  el.textContent = (f.type === 'ok' ? '✓ ' : '⏳ ') + f.texte;
+  el.hidden = false;
 }
 
 /* ---------- Démarrage ---------- */
 const sessionEnCours = lireSession();
 niveau = sessionEnCours ? sessionEnCours.niveau : null;
+afficherFlash();
 dessiner();
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

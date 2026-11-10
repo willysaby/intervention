@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Nouvelle commande</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="commun.css">
+<style>
+  .page { max-width: 960px; }
+  .carteForm { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .carteForm h2 { margin: 0 0 10px; font-size: 16px; color: var(--lien); }
+  .carteForm label { display: block; font-weight: 600; font-size: 14px; margin: 12px 0 6px; }
+  .carteForm label:first-of-type { margin-top: 0; }
+  .grille2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .grille2 label { margin-top: 0 !important; }
+  .req { color: var(--koink); }
+  textarea.champ { min-height: 150px; resize: vertical; font-family: inherit; }
+  .ligneCmd { display: grid; grid-template-columns: 140px 1fr 90px 110px 110px 36px; gap: 8px; align-items: start; margin-bottom: 8px; }
+  .ligneCmd .tot { padding: 11px 4px; text-align: right; font-weight: 700; white-space: nowrap; }
+  .ligneCmd button { border: 1px solid var(--line); background: var(--card); color: var(--koink); border-radius: 8px; height: 42px; font-size: 18px; }
+  .entetesLignes { display: grid; grid-template-columns: 140px 1fr 90px 110px 110px 36px; gap: 8px; font-size: 12px; font-weight: 700; color: var(--mute); margin-bottom: 4px; }
+  @media (max-width: 720px) {
+    .entetesLignes { display: none; }
+    .ligneCmd { grid-template-columns: 1fr 1fr; border: 1px solid var(--line2); border-radius: 12px; padding: 10px; }
+    .ligneCmd .desc { grid-column: 1 / -1; }
+  }
+  .totaux { margin-left: auto; max-width: 320px; margin-top: 12px; }
+  .totaux div { display: flex; justify-content: space-between; padding: 4px 0; }
+  .totaux .ttc { font-weight: 800; font-size: 18px; border-top: 2px solid var(--vert); margin-top: 4px; padding-top: 8px; }
+  #message { margin: 10px 0; font-weight: 600; min-height: 1.2em; }
+  #message.ko { color: var(--koink); }
+  #message.ok { color: var(--okink); }
+  .envoyer { width: 100%; padding: 14px; font-size: 17px; font-weight: 700; }
+  .aide { color: var(--mute); font-size: 13px; margin: 4px 0 0; }
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <div class="haut"><a href="./">← Accueil</a><a href="achats.html">Voir la liste</a></div>
+  <form id="formulaire" autocomplete="off" novalidate>
+    <div class="carteForm">
+      <h2>Commande</h2>
+      <div class="grille2">
+        <div><label for="fournisseur">Fournisseur <span class="req">*</span></label>
+          <input class="champ" id="fournisseur" list="listeFourn" placeholder="Première lettres du nom...">
+          <datalist id="listeFourn"></datalist></div>
+        <div><label for="destinataire">Email du fournisseur <span class="req">*</span></label>
+          <input class="champ" id="destinataire" type="text" inputmode="email" placeholder="commande@fournisseur.fr (plusieurs : séparer par ;)">
+          <p class="aide" id="aideFourn"></p></div>
+        <div><label for="date">Date de commande</label><input class="champ" id="date" type="date"></div>
+        <div><label for="numero">Numéro</label><input class="champ" id="numero" readonly></div>
+        <div><label for="reglement">Mode de règlement</label><input class="champ" id="reglement" placeholder="Ex : 30 jours, carte bancaire..."></div>
+      </div>
+    </div>
+
+    <div class="carteForm">
+      <h2>Lignes de la commande</h2>
+      <div class="entetesLignes"><span>Référence</span><span>Désignation *</span><span>Qté</span><span>Prix U (HT)</span><span style="text-align:right">Total</span><span></span></div>
+      <div id="lignes"></div>
+      <button type="button" class="btn" id="btnLigne">+ Ajouter une ligne</button>
+      <div class="grille2" style="margin-top:14px"><div><label for="tva">TVA (%)</label><input class="champ" id="tva" inputmode="decimal" value="20"></div></div>
+      <div class="totaux">
+        <div><span>Total HT</span><b id="totHt">0,00 €</b></div>
+        <div><span id="libTva">TVA 20 %</span><b id="totTva">0,00 €</b></div>
+        <div class="ttc"><span>Total TTC</span><b id="totTtc">0,00 €</b></div>
+      </div>
+    </div>
+
+    <div class="carteForm">
+      <h2>Mail au fournisseur</h2>
+      <p class="aide" id="expediteur" style="margin-top:0"></p>
+      <label for="objet">Objet</label><input class="champ" id="objet">
+      <label for="message">Message (la signature et le PDF de la commande sont ajoutés automatiquement)</label>
+      <textarea class="champ" id="message2"></textarea>
+    </div>
+
+    <div id="message" role="status"></div>
+    <button type="submit" class="btn vert envoyer" id="envoyer">Valider et envoyer la commande</button>
+  </form>
+</div>
+
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="shell.js"></script>
+<script>
+let fournisseurs = [], idEnvoi = '', enCours = false;
+function el(id) { return document.getElementById(id); }
+function nb(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[\s€]/g, '').replace(',', '.')); return isFinite(n) ? n : 0; }
+function euros(n) { return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+function arrondi(n) { return Math.round(n * 100) / 100; }
+function aujourdhui() { const d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function nouvelId() { return 'A' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function msg(t, c) { const m = el('message'); m.textContent = t; m.className = c || ''; }
+
+function ajouterLigne() {
+  const d = document.createElement('div');
+  d.className = 'ligneCmd';
+  d.innerHTML = '<input class="champ ref" placeholder="Référence" maxlength="60">' +
+    '<input class="champ desc" placeholder="Désignation" maxlength="300">' +
+    '<input class="champ qte" inputmode="decimal" value="1" placeholder="Qté">' +
+    '<input class="champ pu" inputmode="decimal" placeholder="0,00">' +
+    '<div class="tot">0,00 €</div><button type="button" title="Supprimer la ligne" aria-label="Supprimer la ligne">×</button>';
+  d.querySelector('button').onclick = () => { if (document.querySelectorAll('.ligneCmd').length > 1) { d.remove(); calculer(); } else { d.querySelectorAll('input').forEach(i => i.value = ''); d.querySelector('.qte').value = '1'; calculer(); } };
+  d.querySelectorAll('input').forEach(i => i.addEventListener('input', calculer));
+  el('lignes').appendChild(d);
+  return d;
+}
+function calculer() {
+  let ht = 0;
+  document.querySelectorAll('.ligneCmd').forEach(l => {
+    const t = arrondi(nb(l.querySelector('.qte').value) * nb(l.querySelector('.pu').value));
+    l.querySelector('.tot').textContent = euros(t);
+    ht += t;
+  });
+  ht = arrondi(ht);
+  const taux = el('tva').value.trim() === '' ? 20 : nb(el('tva').value);
+  const tva = arrondi(ht * taux / 100);
+  el('totHt').textContent = euros(ht);
+  el('libTva').textContent = 'TVA ' + String(taux).replace('.', ',') + ' %';
+  el('totTva').textContent = euros(tva);
+  el('totTtc').textContent = euros(arrondi(ht + tva));
+}
+
+function fournisseurConnu() {
+  const v = el('fournisseur').value.trim().toLowerCase();
+  return fournisseurs.find(f => f.nom.toLowerCase() === v) || null;
+}
+function surFournisseur() {
+  const f = fournisseurConnu();
+  if (f) {
+    if (f.email) el('destinataire').value = f.email;
+    el('aideFourn').textContent = f.email ? 'Fournisseur connu : adresse pré-remplie (modifiable).' : 'Fournisseur connu, sans adresse enregistrée : saisis-la, elle sera gardée.';
+  } else {
+    el('aideFourn').textContent = el('fournisseur').value.trim() ? 'Nouveau fournisseur : il sera ajouté à la liste avec cette adresse.' : '';
+  }
+}
+
+async function init() {
+  if (!Nova.exiger('gestionnaire')) return;
+  let r;
+  try { r = await Nova.api('achatInit', null, 20000); } catch (e) { Nova.bloquer(e.message); return; }
+  fournisseurs = r.fournisseurs;
+  r.fournisseurs.forEach(f => { const o = document.createElement('option'); o.value = f.nom; el('listeFourn').appendChild(o); });
+  el('numero').value = r.numero;
+  el('date').value = aujourdhui();
+  el('objet').value = r.objet;
+  el('message2').value = r.message;
+  el('expediteur').textContent = 'Le mail part de ' + r.expediteur + ' (signature : ' + r.signataire + ') et reste dans ses éléments envoyés.';
+  el('tva').value = r.tva;
+  idEnvoi = nouvelId();
+  ajouterLigne();
+  calculer();
+}
+
+el('btnLigne').onclick = () => { ajouterLigne().querySelector('.ref').focus(); };
+el('fournisseur').addEventListener('input', surFournisseur);
+el('fournisseur').addEventListener('change', surFournisseur);
+el('tva').addEventListener('input', calculer);
+
+el('formulaire').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  if (enCours) return;
+  const lignes = [...document.querySelectorAll('.ligneCmd')].map(l => ({
+    ref: l.querySelector('.ref').value.trim(), desc: l.querySelector('.desc').value.trim(),
+    qte: l.querySelector('.qte').value.trim(), pu: l.querySelector('.pu').value.trim()
+  })).filter(l => l.ref || l.desc || l.pu);
+  if (!el('fournisseur').value.trim()) { msg('Le fournisseur est obligatoire.', 'ko'); el('fournisseur').focus(); return; }
+  if (!el('destinataire').value.trim()) { msg('L\'email du fournisseur est obligatoire.', 'ko'); el('destinataire').focus(); return; }
+  if (!lignes.length) { msg('Ajoute au moins une ligne de commande.', 'ko'); return; }
+  if (lignes.some(l => !l.desc)) { msg('Chaque ligne doit avoir une désignation.', 'ko'); return; }
+  enCours = true;
+  const btn = el('envoyer'); btn.disabled = true;
+  msg('Création du PDF et envoi du mail...', '');
+  const f = fournisseurConnu();
+  try {
+    const r = await Nova.api('achatCreer', {
+      idEnvoi: idEnvoi, fournisseur: el('fournisseur').value.trim(), destinataire: el('destinataire').value.trim(),
+      contact: f ? f.contact : '', date: el('date').value, reglement: el('reglement').value.trim(), tva: el('tva').value,
+      lignes: lignes, objet: el('objet').value.trim(), message: el('message2').value
+    }, 90000);
+    try {
+      localStorage.setItem('flashAchats', JSON.stringify({ ts: Date.now(), type: r.avertissement ? 'ko' : 'ok',
+        texte: r.avertissement ? 'Commande ' + r.numero + ' : ' + r.avertissement : 'Commande ' + r.numero + ' envoyée à ' + el('fournisseur').value.trim() + '.' }));
+    } catch (e) {}
+    location.href = 'achats.html';
+  } catch (e) {
+    msg(e.code === 'reseau'
+      ? 'Pas de réponse du serveur. Vérifie la liste avant de recommencer : si la commande y figure, elle est bien partie. (Tu peux aussi revalider : elle ne sera pas créée en double.)'
+      : e.message, 'ko');
+    enCours = false; btn.disabled = false;
+  }
+});
+init();
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>

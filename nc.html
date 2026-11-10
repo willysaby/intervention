@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Non-conformités</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="commun.css">
+<style>
+  .tableau td.long { text-align: left; min-width: 220px; white-space: pre-wrap; }
+  .etat { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+  .etat.ouvert { background: var(--warnbg); color: var(--warnink); }
+  .etat.clos { background: var(--okbg); color: var(--okink); }
+  select.champ { appearance: auto; }
+</style>
+</head>
+<body>
+<div class="page" id="page" style="max-width:none">
+  <div class="haut">
+    <a href="./">← Accueil</a>
+    <h1>Non-conformités</h1>
+    <div><a class="btn vert" href="nc-ajout.html" style="text-decoration:none;display:inline-block">+ Ajouter une NC</a></div>
+  </div>
+  <div class="filtres">
+    <div><label for="fType">Type</label>
+      <select class="champ" id="fType">
+        <option value="">Tous les types</option>
+        <option value="fournisseur">NC fournisseur</option>
+        <option value="fabrication">NC fabrication</option>
+        <option value="commande">NC commande</option>
+      </select></div>
+    <div><label for="fDu">Date de réclamation : du</label><input class="champ" id="fDu" type="date"></div>
+    <div><label for="fAu">au</label><input class="champ" id="fAu" type="date"></div>
+    <div><label for="fEtat">Dossier</label>
+      <select class="champ" id="fEtat">
+        <option value="">Tous</option>
+        <option value="ouvert">Ouverts (non clôturés)</option>
+        <option value="clos">Clôturés</option>
+      </select></div>
+    <div><label for="recherche">Recherche libre</label><input class="champ" id="recherche" type="search" placeholder="Client, fournisseur, commande, OF..."></div>
+    <div><button class="btn" type="button" id="btnEffacer">Tout afficher</button></div>
+  </div>
+  <div id="infos"></div>
+  <div id="erreur" class="erreurPage" hidden></div>
+  <div class="tableau" id="zone" hidden></div>
+</div>
+
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="shell.js"></script>
+<script>
+const LIBELLES_TYPES = { fournisseur: 'Fournisseur', fabrication: 'Fabrication', commande: 'Commande' };
+// Colonnes affichées selon le type choisi (« Tous » : toutes les colonnes communes)
+const COLONNES = [
+  { cle: 'type', lib: 'Type', pour: ['tous'] },
+  { cle: 'date', lib: 'Date de réclamation', date: true },
+  { cle: 'fournisseur', lib: 'Fournisseur', pour: ['tous', 'fournisseur'] },
+  { cle: 'client', lib: 'Client', pour: ['tous', 'fabrication', 'commande', 'fournisseur'] },
+  { cle: 'commande', lib: 'Commande' },
+  { cle: 'article', lib: 'Code et désignation article non-conforme', long: true },
+  { cle: 'of', lib: 'OF' },
+  { cle: 'nc', lib: 'Non-conformité', long: true },
+  { cle: 'action', lib: 'Action', long: true },
+  { cle: 'ofnc', lib: 'OF NC' },
+  { cle: 'cloture', lib: 'Clôture dossier', date: true, etat: true }
+];
+let donnees = null;
+
+function val(id) { return document.getElementById(id).value.trim(); }
+function jolieDate(s) { return s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(0, 4) : (s || ''); }
+function ymd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+
+function montrerErreur(texte) {
+  document.getElementById('zone').hidden = true;
+  document.getElementById('infos').textContent = '';
+  const e = document.getElementById('erreur');
+  e.textContent = texte;
+  e.hidden = false;
+}
+
+function filtrer() {
+  const type = val('fType'), du = val('fDu'), au = val('fAu'), etat = val('fEtat');
+  const texte = Nova.norm(val('recherche'));
+  return donnees.lignes.filter(l => {
+    if (type && l.type !== type) return false;
+    if (du && (!l.date || l.date < du)) return false;
+    if (au && (!l.date || l.date > au)) return false;
+    if (etat === 'ouvert' && l.cloture) return false;
+    if (etat === 'clos' && !l.cloture) return false;
+    if (texte) {
+      const t = Nova.norm([LIBELLES_TYPES[l.type], l.fournisseur, l.client, l.commande, l.article, l.of, l.nc, l.action, l.ofnc].join(' '));
+      if (t.indexOf(texte) < 0) return false;
+    }
+    return true;
+  });
+}
+
+function dessiner() {
+  document.getElementById('erreur').hidden = true;
+  const type = val('fType') || 'tous';
+  const colonnes = COLONNES.filter(c => !c.pour || c.pour.indexOf(type) >= 0);
+  const lignes = filtrer();
+  const table = document.createElement('table');
+  const tr = document.createElement('tr');
+  colonnes.forEach(c => {
+    const th = document.createElement('th');
+    th.textContent = (c.cle === 'client' && type === 'fournisseur') ? 'Nom client' : c.lib;
+    tr.appendChild(th);
+  });
+  const thead = document.createElement('thead');
+  thead.appendChild(tr);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  lignes.forEach((l, i) => {
+    const ligne = document.createElement('tr');
+    ligne.className = i % 2 ? 'g2' : 'g1';
+    colonnes.forEach(c => {
+      const td = document.createElement('td');
+      if (c.cle === 'type') td.textContent = LIBELLES_TYPES[l.type];
+      else if (c.etat) {
+        if (l.cloture) { td.textContent = jolieDate(l.cloture); }
+        else { const b = document.createElement('span'); b.className = 'etat ouvert'; b.textContent = 'Ouvert'; td.appendChild(b); }
+      } else td.textContent = c.date ? jolieDate(l[c.cle]) : (l[c.cle] || '');
+      if (c.long) td.className = 'long';
+      ligne.appendChild(td);
+    });
+    tbody.appendChild(ligne);
+  });
+  table.appendChild(tbody);
+  const zone = document.getElementById('zone');
+  zone.innerHTML = '';
+  zone.appendChild(table);
+  zone.hidden = lignes.length === 0;
+  const ouvertes = lignes.filter(l => !l.cloture).length;
+  document.getElementById('infos').textContent = lignes.length === 0
+    ? 'Aucune non-conformité pour ces filtres.'
+    : lignes.length + (lignes.length > 1 ? ' non-conformités' : ' non-conformité') + ' · ' + ouvertes + (ouvertes > 1 ? ' non clôturées' : ' non clôturée');
+}
+
+function appliquerUrl() {
+  const p = new URLSearchParams(location.search);
+  const t = p.get('type');
+  if (t && LIBELLES_TYPES[t]) document.getElementById('fType').value = t;
+  if (p.get('periode') === '30') {
+    const d = new Date(Date.now() - ((donnees && donnees.jours) || 30) * 86400000);
+    document.getElementById('fDu').value = ymd(d);
+  }
+}
+
+async function charger() {
+  if (!Nova.exiger('gestionnaire')) return;
+  document.getElementById('infos').textContent = 'Chargement...';
+  try {
+    donnees = await Nova.api('ncListe');
+  } catch (e) { montrerErreur(e.message); return; }
+  appliquerUrl();
+  dessiner();
+}
+
+['fType', 'fDu', 'fAu', 'fEtat'].forEach(id => document.getElementById(id).addEventListener('change', () => donnees && dessiner()));
+document.getElementById('recherche').addEventListener('input', () => donnees && dessiner());
+document.getElementById('btnEffacer').onclick = () => {
+  ['fType', 'fDu', 'fAu', 'fEtat', 'recherche'].forEach(id => document.getElementById(id).value = '');
+  if (donnees) dessiner();
+};
+charger();
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>

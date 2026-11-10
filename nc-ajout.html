@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Ajouter une non-conformité</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="commun.css">
+<style>
+  .page { max-width: 640px; }
+  .formulaire { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  .formulaire label { display: block; font-weight: 600; font-size: 14px; margin: 14px 0 6px; }
+  .formulaire label:first-child { margin-top: 0; }
+  .formulaire label .req { color: var(--koink); }
+  textarea.champ { min-height: 96px; resize: vertical; font-family: inherit; }
+  select.champ { appearance: auto; }
+  #champs { margin-top: 4px; }
+  #message { margin-top: 12px; font-weight: 600; font-size: 14px; min-height: 1.2em; }
+  #message.ok { color: var(--okink); }
+  #message.ko { color: var(--koink); }
+  .envoyer { width: 100%; margin-top: 16px; padding: 14px; font-size: 17px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <div class="haut"><a href="./">← Accueil</a><a href="nc.html">Voir la liste</a></div>
+  <form class="formulaire" id="formulaire" autocomplete="off" novalidate>
+    <label for="type">Type de non-conformité <span class="req">*</span></label>
+    <select class="champ" id="type"><option value="">Choisir…</option></select>
+    <div id="champs"></div>
+    <button type="submit" class="btn vert envoyer" id="envoyer" hidden>Enregistrer la non-conformité</button>
+    <div id="message" role="status"></div>
+  </form>
+</div>
+
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="shell.js"></script>
+<script>
+let schema = null, enCours = false;
+
+function aujourdhui() {
+  const d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+function msg(texte, classe) {
+  const m = document.getElementById('message');
+  m.textContent = texte;
+  m.className = classe || '';
+}
+
+function dessinerChamps() {
+  const t = schema.types.find(x => x.id === document.getElementById('type').value);
+  const zone = document.getElementById('champs');
+  zone.innerHTML = '';
+  document.getElementById('envoyer').hidden = !t;
+  if (!t) return;
+  t.champs.forEach(f => {
+    const lab = document.createElement('label');
+    lab.htmlFor = 'f_' + f.cle;
+    lab.textContent = f.lib;
+    if (f.requis) { const r = document.createElement('span'); r.className = 'req'; r.textContent = ' *'; lab.appendChild(r); }
+    let el;
+    if (f.type === 'long') { el = document.createElement('textarea'); }
+    else { el = document.createElement('input'); el.type = f.type === 'date' ? 'date' : 'text'; }
+    el.className = 'champ';
+    el.id = 'f_' + f.cle;
+    el.maxLength = 2000;
+    if (f.cle === 'date') el.value = aujourdhui();
+    zone.appendChild(lab);
+    zone.appendChild(el);
+  });
+}
+
+async function init() {
+  if (!Nova.exiger('gestionnaire')) return;
+  try {
+    schema = await Nova.api('ncSchema');
+  } catch (e) { Nova.bloquer(e.message); return; }
+  const sel = document.getElementById('type');
+  schema.types.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.lib; sel.appendChild(o); });
+  sel.onchange = () => { msg(''); dessinerChamps(); };
+}
+
+document.getElementById('formulaire').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  if (enCours || !schema) return;
+  const type = document.getElementById('type').value;
+  const t = schema.types.find(x => x.id === type);
+  if (!t) { msg('Choisis le type de non-conformité.', 'ko'); return; }
+  const valeurs = {};
+  for (const f of t.champs) {
+    const v = document.getElementById('f_' + f.cle).value.trim();
+    if (f.requis && !v) { msg('Champ obligatoire : ' + f.lib + '.', 'ko'); document.getElementById('f_' + f.cle).focus(); return; }
+    valeurs[f.cle] = v;
+  }
+  enCours = true;
+  const btn = document.getElementById('envoyer');
+  btn.disabled = true;
+  msg('Enregistrement...', '');
+  try {
+    await Nova.api('ncAjouter', { type: type, valeurs: valeurs });
+    msg('Non-conformité enregistrée (' + t.lib + ').', 'ok');
+    dessinerChamps();
+    window.scrollTo(0, 0);
+  } catch (e) {
+    msg(e.message, 'ko');
+  }
+  enCours = false;
+  btn.disabled = false;
+});
+init();
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>

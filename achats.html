@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Achats</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="commun.css">
+<style>
+  .tableau td.long { text-align: left; min-width: 260px; }
+  .tableau td.num { white-space: nowrap; text-align: right; }
+  .btnPetit { padding: 6px 10px; font-size: 13px; display: block; margin: 2px auto; white-space: nowrap; }
+  .recue { background: var(--okbg); color: var(--okink); border-color: transparent; }
+  .arecevoir { background: var(--warnbg); color: var(--warnink); border-color: transparent; }
+  .badge { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; background: var(--kobg); color: var(--koink); margin-top: 4px; }
+  .flash { border-radius: 14px; padding: 14px 16px; margin: 0 0 12px; font-weight: 700; }
+  .flash.ok { background: var(--okbg); color: var(--okink); }
+  .flash.ko { background: var(--warnbg); color: var(--warnink); }
+  select.champ { appearance: auto; }
+  .total { font-weight: 700; color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="page" id="page" style="max-width:none">
+  <div class="haut">
+    <a href="./">← Accueil</a>
+    <h1>Achats fournisseurs</h1>
+    <div><a class="btn vert" href="achat-nouveau.html" style="text-decoration:none;display:inline-block">+ Nouvelle commande</a></div>
+  </div>
+  <div class="flash" id="flash" hidden></div>
+  <div class="filtres">
+    <div><label for="recherche">Recherche libre</label><input class="champ" id="recherche" type="search" placeholder="Fournisseur, N°, description..."></div>
+    <div><label for="fFourn">Fournisseur</label><input class="champ" id="fFourn" type="search" list="listeFourn"><datalist id="listeFourn"></datalist></div>
+    <div><label for="fDu">Date : du</label><input class="champ" id="fDu" type="date"></div>
+    <div><label for="fAu">au</label><input class="champ" id="fAu" type="date"></div>
+    <div><label for="fEtat">Réception</label>
+      <select class="champ" id="fEtat"><option value="">Toutes</option><option value="a">À recevoir</option><option value="r">Reçues</option></select></div>
+    <div><button class="btn" type="button" id="btnEffacer">Effacer les filtres</button></div>
+  </div>
+  <div id="infos"></div>
+  <div id="erreur" class="erreurPage" hidden></div>
+  <div class="tableau" id="zone" hidden></div>
+</div>
+
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="shell.js"></script>
+<script>
+let donnees = null;
+function val(id) { return document.getElementById(id).value.trim(); }
+function jolieDate(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(0, 4) : (s || ''); }
+function euros(n) { return Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+
+function montrerErreur(t) {
+  document.getElementById('zone').hidden = true;
+  document.getElementById('infos').textContent = '';
+  const e = document.getElementById('erreur'); e.textContent = t; e.hidden = false;
+}
+function afficherFlash() {
+  let f = null;
+  try { f = JSON.parse(localStorage.getItem('flashAchats')); localStorage.removeItem('flashAchats'); } catch (e) {}
+  if (!f || !f.texte || Date.now() - (f.ts || 0) > 120000) return;
+  const el = document.getElementById('flash');
+  el.className = 'flash ' + (f.type === 'ok' ? 'ok' : 'ko');
+  el.textContent = (f.type === 'ok' ? '✓ ' : '⚠ ') + f.texte;
+  el.hidden = false;
+}
+
+function filtrer() {
+  const t = Nova.norm(val('recherche')), fo = Nova.norm(val('fFourn')), du = val('fDu'), au = val('fAu'), etat = val('fEtat');
+  return donnees.lignes.filter(l => {
+    if (fo && Nova.norm(l.fournisseur).indexOf(fo) < 0) return false;
+    if (du && (!l.date || l.date < du)) return false;
+    if (au && (!l.date || l.date > au)) return false;
+    if (etat === 'a' && l.recue) return false;
+    if (etat === 'r' && !l.recue) return false;
+    if (t && Nova.norm([l.fournisseur, l.numero, l.description, l.destinataire].join(' ')).indexOf(t) < 0) return false;
+    return true;
+  });
+}
+
+function dessiner() {
+  document.getElementById('erreur').hidden = true;
+  const lignes = filtrer();
+  const cols = ['Fournisseur', 'Date Cde', 'N° Commande', 'Description', 'Montant HT', 'Reçue', 'Document'];
+  const table = document.createElement('table');
+  const thead = document.createElement('thead'), tr = document.createElement('tr');
+  cols.forEach(c => { const th = document.createElement('th'); th.textContent = c; tr.appendChild(th); });
+  thead.appendChild(tr); table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  lignes.forEach((l, i) => {
+    const r = document.createElement('tr');
+    r.className = i % 2 ? 'g2' : 'g1';
+    const cell = (txt, cls) => { const td = document.createElement('td'); td.textContent = txt; if (cls) td.className = cls; r.appendChild(td); return td; };
+    cell(l.fournisseur);
+    cell(jolieDate(l.date));
+    cell(l.numero);
+    cell(l.description, 'long');
+    cell(euros(l.montant), 'num');
+    // Reçue : un appui bascule
+    const tdR = document.createElement('td');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btnPetit ' + (l.recue ? 'recue' : 'arecevoir');
+    b.textContent = l.recue ? 'Reçue ✓' : 'À recevoir';
+    b.onclick = () => basculerRecue(l, b);
+    tdR.appendChild(b); r.appendChild(tdR);
+    // Document : voir la commande (PDF) ; mail non parti : bouton Renvoyer
+    const tdD = document.createElement('td');
+    if (l.idPdf) {
+      const v = document.createElement('button');
+      v.type = 'button'; v.className = 'btn btnPetit'; v.textContent = 'Commande';
+      v.onclick = () => Nova.ouvrirVisio({ id: l.idPdf, titre: l.numero + ' · ' + l.fournisseur });
+      tdD.appendChild(v);
+    }
+    if (l.mail && l.mail !== 'Envoyé') {
+      const rb = document.createElement('button');
+      rb.type = 'button'; rb.className = 'btn btnPetit'; rb.textContent = 'Renvoyer le mail';
+      rb.title = l.mail;
+      rb.onclick = () => renvoyer(l, rb);
+      tdD.appendChild(rb);
+      const bg = document.createElement('span'); bg.className = 'badge'; bg.textContent = 'Mail non parti'; tdD.appendChild(bg);
+    }
+    r.appendChild(tdD);
+    tbody.appendChild(r);
+  });
+  table.appendChild(tbody);
+  const zone = document.getElementById('zone');
+  zone.innerHTML = ''; zone.appendChild(table);
+  zone.hidden = lignes.length === 0;
+  const somme = lignes.reduce((s, l) => s + l.montant, 0);
+  const attente = lignes.filter(l => !l.recue).length;
+  document.getElementById('infos').textContent = lignes.length === 0 ? 'Aucune commande pour ces filtres.'
+    : lignes.length + (lignes.length > 1 ? ' commandes' : ' commande') + ' · ' + attente + ' à recevoir · total HT ' + euros(somme);
+}
+
+async function basculerRecue(l, bouton) {
+  bouton.disabled = true;
+  try {
+    const r = await Nova.api('achatRecue', { ligne: l.ligne, numero: l.numero, valeur: !l.recue });
+    l.recue = r.recue;
+    dessiner();
+  } catch (e) { bouton.disabled = false; montrerErreurTemporaire(e.message); }
+}
+async function renvoyer(l, bouton) {
+  bouton.disabled = true; bouton.textContent = 'Envoi...';
+  try {
+    await Nova.api('achatRenvoyer', { ligne: l.ligne, numero: l.numero }, 60000);
+    l.mail = 'Envoyé';
+    dessiner();
+  } catch (e) { bouton.disabled = false; bouton.textContent = 'Renvoyer le mail'; montrerErreurTemporaire(e.message); }
+}
+function montrerErreurTemporaire(t) {
+  const el = document.getElementById('flash');
+  el.className = 'flash ko'; el.textContent = '⚠ ' + t; el.hidden = false;
+}
+
+async function charger() {
+  if (!Nova.exiger('gestionnaire')) return;
+  afficherFlash();
+  document.getElementById('infos').textContent = 'Chargement...';
+  try { donnees = await Nova.api('achatListe', null, 20000); } catch (e) { montrerErreur(e.message); return; }
+  const dl = document.getElementById('listeFourn');
+  [...new Set(donnees.lignes.map(l => l.fournisseur))].sort().forEach(n => { const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
+  dessiner();
+}
+['fDu', 'fAu', 'fEtat'].forEach(id => document.getElementById(id).addEventListener('change', () => donnees && dessiner()));
+['recherche', 'fFourn'].forEach(id => document.getElementById(id).addEventListener('input', () => donnees && dessiner()));
+document.getElementById('btnEffacer').onclick = () => { ['recherche', 'fFourn', 'fDu', 'fAu', 'fEtat'].forEach(id => document.getElementById(id).value = ''); if (donnees) dessiner(); };
+charger();
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>

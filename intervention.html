@@ -116,11 +116,12 @@ const URL_API = (window.CONFIG && window.CONFIG.URL_API) || '';
 function urlApiRenseignee() { return URL_API !== '' && URL_API.indexOf('COLLE_ICI') !== 0; }
 const CLE_ATTENTE = 'bonsEnAttente';
 const CLE_TECHNICIENS = 'techniciensMemorises';
-const VERSION_PAGE = '2026-11-09-c';
+const VERSION_PAGE = '2026-11-10-b';
 const COMMENTAIRE_SINGULIER = 'Intervention sur site pour la mise en longueur + jonction + réglage bande client. A contrôler en production';
 const COMMENTAIRE_PLURIEL = 'Intervention sur site pour les mises en longueur + jonctions + réglages bandes client. A contrôler en production';
 let commentaireAuto = '';
-const DELAI_MAX_MS = 90000;
+const DELAI_MAX_MS = 90000;        // renvoi des bons en attente (arrière-plan)
+const DELAI_ENVOI_MS = 20000;      // envoi à la validation : au-delà, le bon reste en attente et on revient à l'accueil
 // Ouvert depuis « Commandes en cours » : ?doc=<id du PDF>&cd=<N° de commande>&client=<client>
 const PARAMS = new URLSearchParams(location.search);
 const DOC_ID = PARAMS.get('doc') || '';
@@ -136,12 +137,12 @@ function creerErreur(type, message) {
 }
 
 /* ---------- Envoi d'un bon au script Apps Script ---------- */
-async function posterBon(donnees) {
+async function posterBon(donnees, delai) {
   if (!urlApiRenseignee()) throw creerErreur('serveur', 'Adresse du script non renseignée : remplis URL_API dans config.js.');
   const s = Nova.session();
   if (!s) throw creerErreur('session', 'Connexion requise : ouvre l\'accueil et connecte-toi, puis renvoie le bon.');
   const ctrl = new AbortController();
-  const minuteur = setTimeout(() => ctrl.abort(), DELAI_MAX_MS);
+  const minuteur = setTimeout(() => ctrl.abort(), delai || DELAI_MAX_MS);
   let r;
   try {
     r = await fetch(URL_API, { method: 'POST', body: JSON.stringify(Object.assign({}, donnees, { jeton: s.jeton })), signal: ctrl.signal });
@@ -251,8 +252,10 @@ async function chargerDonnees() {
   document.getElementById('techniciens').innerHTML = '<div class="erreurTech" style="color:#555">Chargement...</div>';
   try {
     if (!urlApiRenseignee()) throw new Error('Adresse du script non renseignée : remplis URL_API dans config.js.');
-    const r = await fetch(URL_API);
-    const d = await r.json();
+    const ctrl = new AbortController();
+    const minuteur = setTimeout(() => ctrl.abort(), 8000);   // réseau faible : on prend la liste enregistrée
+    let d;
+    try { const r = await fetch(URL_API, { signal: ctrl.signal }); d = await r.json(); } finally { clearTimeout(minuteur); }
     if (d.erreur) throw new Error(d.erreur);
     localStorage.setItem(CLE_TECHNICIENS, JSON.stringify(d.techniciens));
     document.getElementById('numero').textContent = 'N° ' + d.numero;
@@ -401,32 +404,41 @@ async function valider() {
   };
 
   const btn = document.getElementById('btnValider');
-  btn.disabled = true; msg.textContent = 'Envoi en cours...';
+  btn.disabled = true;
 
-  if (!navigator.onLine) { garderEnAttente(donnees, 'Pas de connexion Internet.'); return; }
-
-  try {
-    const res = await posterBon(donnees);
-    msg.textContent = 'Bon ' + res.numero + ' envoyé !' + (res.avertissement ? ' ⚠ ' + res.avertissement : '');
-    setTimeout(() => { if (DOC_ID) location.href = 'commandes.html'; else location.reload(); }, res.avertissement ? 9000 : 2500);
-  } catch (e) {
-    garderEnAttente(donnees, e.message);
-  }
-}
-
-function garderEnAttente(donnees, raison) {
+  // 1. Le bon est d'abord gardé sur l'appareil : il ne peut plus se perdre, même si le réseau lâche
   const liste = lireAttente();
-  liste.push({ id: donnees.idEnvoi, donnees: donnees, erreur: raison || '' });
+  liste.push({ id: donnees.idEnvoi, donnees: donnees, erreur: '' });
   try {
     ecrireAttente(liste);
   } catch (e) {
-    document.getElementById('message').textContent = 'Mémoire pleine : impossible de garder le bon. Envoie-le dès que possible.';
-    document.getElementById('btnValider').disabled = false;
+    msg.textContent = 'Mémoire pleine : impossible de garder le bon. Libère de la place puis revalide.';
+    btn.disabled = false;
     return;
   }
-  document.getElementById('message').textContent =
-    'Envoi impossible pour le moment : bon gardé sur l\'appareil. ' + (raison || '');
-  setTimeout(() => { if (DOC_ID) location.href = 'commandes.html'; else location.reload(); }, 6000);
+  if (!navigator.onLine) { allerAccueil('attente', 'Bon enregistré sur l\'appareil. Il partira dès que le réseau le permet.'); return; }
+
+  // 2. Tentative d'envoi (20 s maximum) ; dans tous les cas on revient ensuite à l'accueil
+  msg.textContent = 'Envoi en cours...';
+  envoiEnCours = true;
+  try {
+    const res = await posterBon(donnees, DELAI_ENVOI_MS);
+    ecrireAttente(lireAttente().filter(b => b.id !== donnees.idEnvoi));
+    allerAccueil('ok', 'Envoi validé : bon ' + res.numero + (res.avertissement ? ' ⚠ ' + res.avertissement : ''));
+  } catch (e) {
+    const l2 = lireAttente();
+    const cible = l2.find(b => b.id === donnees.idEnvoi);
+    if (cible) { cible.erreur = e.message; try { ecrireAttente(l2); } catch (x) {} }
+    allerAccueil('attente', e.type === 'session'
+      ? 'Bon enregistré. Connecte-toi pour qu\'il parte.'
+      : 'Bon enregistré, il partira dès que le réseau le permet.');
+  }
+}
+
+// Revient à l'accueil avec un message (« Envoi validé » ou « Bon enregistré ») ; plus de formulaire vide qui laisserait croire à un échec
+function allerAccueil(type, texte) {
+  try { localStorage.setItem('flashAccueil', JSON.stringify({ type: type, texte: texte, ts: Date.now() })); } catch (e) {}
+  location.href = './';
 }
 
 /* ---------- Événements réseau ---------- */

@@ -33,20 +33,24 @@
     return e;
   }
 
-  async function api(action, donnees) {
+  // delai : durée maximale d'attente (ms). Au-delà, on abandonne et la page se rabat sur ses données enregistrées.
+  async function api(action, donnees, delai) {
     const u = urlApi();
     if (!u) throw erreur('config', 'Adresse du script non renseignée (URL_API dans config.js).');
     const s = session();
     if (!s) throw erreur('session', 'Connecte-toi depuis l\'accueil.');
-    let r;
+    const ctrl = new AbortController();
+    const minuteur = setTimeout(function () { ctrl.abort(); }, delai || 15000);
+    let r, res;
     try {
-      r = await fetch(u, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, jeton: s.jeton }, donnees || {})) });
+      r = await fetch(u, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, jeton: s.jeton }, donnees || {})), signal: ctrl.signal });
+      res = await r.json();
     } catch (e) {
-      throw erreur('reseau', 'Pas de connexion au serveur.');
+      clearTimeout(minuteur);
+      if (r && !ctrl.signal.aborted) throw erreur('serveur', 'Réponse inattendue du script (nouvelle version à déployer dans Apps Script ?).');
+      throw erreur('reseau', 'Réseau trop faible ou absent : le serveur n\'a pas répondu à temps.');
     }
-    let res;
-    try { res = await r.json(); }
-    catch (e) { throw erreur('serveur', 'Réponse inattendue du script (nouvelle version à déployer dans Apps Script ?).'); }
+    clearTimeout(minuteur);
     if (!res.ok) throw erreur(res.code || 'serveur', res.erreur || 'Erreur du script.');
     return res;
   }
@@ -165,7 +169,7 @@
     ouvrir.hidden = true;
     info.textContent = 'Chargement du document...';
     try {
-      const doc = await api('document', { id: o.id });
+      const doc = await api('document', { id: o.id }, 45000);
       if (moi !== jeton) return;
       const bytes = octets(doc.donnees);
       if (urlBlob) URL.revokeObjectURL(urlBlob);

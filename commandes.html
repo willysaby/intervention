@@ -92,8 +92,11 @@ function ouvrir(c) {
 async function charger() {
   const infos = document.getElementById('infos');
   infos.textContent = 'Chargement...';
+  let memo = null;
+  try { memo = JSON.parse(localStorage.getItem(CLE_CACHE)); } catch (x) {}
+  if (Array.isArray(memo)) { commandes = memo.map(corrigerClient); dessiner(true); }   // liste enregistrée affichée tout de suite
   try {
-    const res = await Nova.api('commandes');
+    const res = await Nova.api('commandes', null, 12000);
     commandes = res.commandes.map(corrigerClient);
     try { localStorage.setItem(CLE_CACHE, JSON.stringify(commandes)); } catch (e) {}
     dessiner(false);

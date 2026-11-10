@@ -11,6 +11,9 @@
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     moon: '<path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+    cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M3 4h2l2.4 11h11.2l2-8H6.2"/>',
+    wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.1L3 17.7 6.3 21l6.3-6.3a4 4 0 0 0 5.1-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
+    alert: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
   };
   function svg(nom, taille) {
@@ -26,16 +29,27 @@
   const ONGLETS = [
     { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', min: 'technicien', fichiers: ['jonction.html'] },
     { id: 'bon', lib: 'Vierge', href: 'intervention.html', ic: 'plus', min: 'technicien', fichiers: ['intervention.html'] },
-    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', min: null, fichiers: ['', 'index.html'] },
+    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', min: null, fichiers: ['', 'index.html', 'nc.html', 'nc-ajout.html', 'achats.html', 'achat-nouveau.html'] },
     { id: 'commandes', lib: 'Commande', href: 'commandes.html', ic: 'list', min: 'technicien', fichiers: ['commandes.html'] },
     { id: 'finies', lib: 'Finies', href: 'termines.html', ic: 'check', min: 'gestionnaire', fichiers: ['termines.html'] }
   ];
+  // Menu des gestionnaires et administrateurs
+  const ONGLETS_GEST = [
+    { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', fichiers: ['jonction.html'] },
+    { id: 'inter', lib: 'Intervention', href: 'commandes.html', ic: 'wrench', fichiers: ['commandes.html', 'intervention.html', 'termines.html'] },
+    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', fichiers: ['', 'index.html'] },
+    { id: 'achats', lib: 'Achats', href: 'achats.html', ic: 'cart', fichiers: ['achats.html', 'achat-nouveau.html'] },
+    { id: 'nc', lib: 'NC', href: 'nc.html', ic: 'alert', fichiers: ['nc.html', 'nc-ajout.html'] }
+  ];
+  function menuGest() { const s = session(); return !!s && RANG[s.niveau] >= RANG.gestionnaire; }
   const SOUS_TITRES = { accueil: 'Les interventions Novafit', jonction: 'Paramètres de jonction', bon: 'Bon d\'intervention vierge',
-    commandes: 'Bon d\'intervention de commande', finies: 'Interventions finies' };
+    commandes: 'Bon d\'intervention de commande', finies: 'Interventions finies', inter: 'Interventions', achats: 'Achats fournisseurs', nc: 'Non-conformités' };
 
+  const TITRES_PAGES = { 'nc.html': 'Non-conformités', 'nc-ajout.html': 'Ajouter une non-conformité', 'achats.html': 'Achats fournisseurs', 'achat-nouveau.html': 'Nouvelle commande' };
   function fichierCourant() { return decodeURIComponent(location.pathname.split('/').pop()); }
   function ongletActif() {
     const f = fichierCourant();
+    if (menuGest()) return (ONGLETS_GEST.find(o => o.fichiers.indexOf(f) >= 0) || ONGLETS_GEST[2]).id;
     let id = (ONGLETS.find(o => o.fichiers.indexOf(f) >= 0) || ONGLETS.find(function (o) { return o.id === 'accueil'; })).id;
     // Un bon ouvert depuis une commande reste dans l'onglet Commandes
     if (id === 'bon' && new URLSearchParams(location.search).get('doc')) id = 'commandes';
@@ -62,7 +76,7 @@
         '<button type="button" class="enteteBtn" id="btnRecharger" aria-label="Actualiser">' + svg('refresh', 22) + '</button>' +
         '<button type="button" class="enteteBtn" id="btnTheme" aria-label="Changer de thème"></button>';
       document.body.insertBefore(h, document.body.firstChild);
-      h.querySelector('#enteteSous').textContent = SOUS_TITRES[actif] || '';
+      h.querySelector('#enteteSous').textContent = TITRES_PAGES[fichierCourant()] || SOUS_TITRES[actif] || '';
       h.querySelector('#btnRecharger').onclick = function () { location.reload(); };
       const bt = h.querySelector('#btnTheme');
       const maj = function () { bt.innerHTML = svg(themeEffectif() === 'sombre' ? 'sun' : 'moon', 22); };
@@ -76,7 +90,7 @@
     }
     const nav = document.createElement('nav');
     nav.className = 'barreOnglets';
-    ONGLETS.forEach(function (o) {
+    (menuGest() ? ONGLETS_GEST : ONGLETS).forEach(function (o) {
       const ok = !o.min || (s && RANG[s.niveau] >= RANG[o.min]);
       const a = document.createElement('a');
       a.href = ok ? o.href : './';
