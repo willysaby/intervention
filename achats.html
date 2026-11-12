@@ -100,7 +100,8 @@ function dessiner() {
     const cell = (txt, cls) => { const td = document.createElement('td'); td.textContent = txt; if (cls) td.className = cls; r.appendChild(td); return td; };
     cell(l.fournisseur);
     cell(jolieDate(l.date));
-    cell(l.numero);
+    const tdN = cell(l.numero);
+    if (l.saisiPar) { const sp = document.createElement('div'); sp.style.cssText = 'font-size:12px;color:var(--mute)'; sp.textContent = 'par ' + l.saisiPar; tdN.appendChild(sp); }
     cell(l.description, 'long');
     cell(euros(l.montant), 'num');
     // Reçue : un appui bascule
@@ -162,14 +163,43 @@ function montrerErreurTemporaire(t) {
 }
 
 async function charger() {
-  if (!Nova.exiger('gestionnaire')) return;
+  if (!Nova.exiger('achats')) return;
   afficherFlash();
   document.getElementById('infos').textContent = 'Chargement...';
-  try { donnees = await Nova.api('achatListe', null, 20000); } catch (e) { montrerErreur(e.message); return; }
+  let horsLigne = false;
+  try {
+    donnees = await Nova.api('achatListe', null, 20000);
+    try { localStorage.setItem('achatsCache', JSON.stringify(donnees)); } catch (x) {}
+  } catch (e) {
+    if (e.code === 'reseau') { try { donnees = JSON.parse(localStorage.getItem('achatsCache')); horsLigne = !!donnees; } catch (x) {} }
+    if (!donnees) { attenteAch(); montrerErreur(e.message); return; }
+  }
   const dl = document.getElementById('listeFourn');
   [...new Set(donnees.lignes.map(l => l.fournisseur))].sort().forEach(n => { const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
   dessiner();
+  if (horsLigne) document.getElementById('infos').textContent += ' · hors ligne : liste enregistrée sur l\'appareil';
+  attenteAch();
 }
+// Commandes gardées sur l'appareil, pas encore parties
+function attenteAch() {
+  let b = document.getElementById('attenteAch');
+  if (!b) { b = document.createElement('div'); b.id = 'attenteAch'; document.getElementById('infos').before(b); }
+  b.innerHTML = '';
+  Nova.lireFile().filter(x => x.action === 'achatCreer').forEach(x => {
+    const d = x.donnees || {};
+    const t = (d.lignes || []).reduce((s, l) => s + (parseFloat(String(l.qte || 1).replace(',', '.')) || 1) * (parseFloat(String(l.pu || 0).replace(',', '.')) || 0), 0);
+    const c = document.createElement('div');
+    c.className = 'flash ko';
+    c.textContent = '⏳ En cours d\'envoi : ' + (d.fournisseur || '') + ' · ' + euros(t) + ' HT · ' + (x.erreur ? 'refusée : ' + x.erreur : 'partira dès le retour du réseau (numéro attribué à l\'envoi)');
+    if (x.erreur) {
+      const s = document.createElement('button'); s.type = 'button'; s.className = 'btn btnPetit'; s.style.marginLeft = '10px'; s.textContent = 'Supprimer';
+      s.onclick = () => { Nova.retirerDeFile(x.id); };
+      c.appendChild(s);
+    }
+    b.appendChild(c);
+  });
+}
+document.addEventListener('nova:file', e => { attenteAch(); if (e.detail && e.detail.envoyes) charger(); });
 ['fDu', 'fAu', 'fEtat'].forEach(id => document.getElementById(id).addEventListener('change', () => donnees && dessiner()));
 ['recherche', 'fFourn'].forEach(id => document.getElementById(id).addEventListener('input', () => donnees && dessiner()));
 document.getElementById('btnEffacer').onclick = () => { ['recherche', 'fFourn', 'fDu', 'fAu', 'fEtat'].forEach(id => document.getElementById(id).value = ''); if (donnees) dessiner(); };

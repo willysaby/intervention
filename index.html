@@ -83,6 +83,14 @@
       <h2>Achats</h2>
       <div class="grille" id="gridAch"></div>
     </section>
+    <section class="section" id="secFour" hidden>
+      <h2>Fournisseurs</h2>
+      <div class="grille" id="gridFour"></div>
+    </section>
+    <section class="section" id="secAdmin" hidden>
+      <h2>Administration</h2>
+      <div class="grille" id="gridAdmin"></div>
+    </section>
   </div>
 
   <button class="secondaire" id="deconnexion" onclick="deconnecter()" hidden>Se déconnecter</button>
@@ -100,14 +108,15 @@ const LIBELLES = { technicien: 'Technicien', gestionnaire: 'Gestionnaire', admin
 const RANG = { technicien: 1, gestionnaire: 2, admin: 3 };
 
 // Boutons de l'accueil. Pour en ajouter un : copier une ligne.
-// niveauMin : 'technicien' (tout le monde), 'gestionnaire' ou 'admin' (ce niveau et ceux au-dessus)
+// droit : jonction, intervention, nc, achats, gestion, fournisseurs ou admin (réglés pour chaque personne dans la page Utilisateurs)
 const MODULES = [
-  { titre: 'Bon d\'intervention vierge', description: 'Saisie d\'un bon sans commande', fichier: 'intervention.html', niveauMin: 'technicien', icone: 'plus', groupe: 'inter' },
-  { titre: 'Bon d\'intervention de commande', description: 'Choisir une commande en cours', fichier: 'commandes.html', niveauMin: 'technicien', icone: 'list', vedette: true, groupe: 'inter' },
-  { titre: 'Ajouter une NC', description: 'Non-conformité : commande, fournisseur, fabrication', fichier: 'nc-ajout.html', niveauMin: 'gestionnaire', icone: 'alert', masque: true, groupe: 'nc' },
-  { titre: 'Nouvelle commande', description: 'Commande fournisseur : PDF et mail', fichier: 'achat-nouveau.html', niveauMin: 'gestionnaire', icone: 'cart', masque: true, groupe: 'achats' },
-  { titre: 'Interventions finies', description: 'Bons réalisés et PDF des commandes', fichier: 'termines.html', niveauMin: 'gestionnaire', icone: 'check', groupe: 'inter' },
-  { titre: 'Jonction', description: 'Paramètres de jonction', fichier: 'jonction.html', niveauMin: 'technicien', icone: 'sliders', groupe: 'inter' }
+  { titre: 'Bon d\'intervention vierge', description: 'Saisie d\'un bon sans commande', fichier: 'intervention.html', droit: 'intervention', icone: 'plus', groupe: 'inter' },
+  { titre: 'Bon d\'intervention de commande', description: 'Choisir une commande en cours', fichier: 'commandes.html', droit: 'intervention', icone: 'list', vedette: true, groupe: 'inter' },
+  { titre: 'Interventions finies', description: 'Bons réalisés et PDF des commandes', fichier: 'termines.html', droit: 'gestion', icone: 'check', groupe: 'inter' },
+  { titre: 'Jonction', description: 'Paramètres de jonction', fichier: 'jonction.html', droit: 'jonction', icone: 'sliders', groupe: 'inter' },
+  { titre: 'Ajouter une NC', description: 'Non-conformité : commande, fournisseur, fabrication', fichier: 'nc-ajout.html', droit: 'nc', icone: 'alert', groupe: 'nc' },
+  { titre: 'Nouvelle commande', description: 'Commande fournisseur : PDF et mail', fichier: 'achat-nouveau.html', droit: 'achats', icone: 'cart', groupe: 'achats' },
+  { titre: 'Chercher un fournisseur', description: 'Matières et produits finis, par mot-clé', fichier: 'fournisseurs.html', droit: 'fournisseurs', icone: 'tag', groupe: 'four' }
 ];
 
 let niveau = null;
@@ -116,13 +125,13 @@ let niveau = null;
 function lireSession() {
   try {
     const s = JSON.parse(localStorage.getItem(CLE_SESSION));
-    if (s && RANG[s.niveau] && s.jeton && s.expire > Date.now()) return s;
+    if (s && RANG[s.niveau] && Array.isArray(s.droits) && s.jeton && s.expire > Date.now()) return s;
   } catch (e) {}
   return null;
 }
-function ecrireSession(n, jeton) {
+function ecrireSession(res) {
   try {
-    localStorage.setItem(CLE_SESSION, JSON.stringify({ niveau: n, jeton: jeton, expire: Date.now() + DUREE_SESSION_H * 3600 * 1000 }));
+    localStorage.setItem(CLE_SESSION, JSON.stringify({ niveau: res.niveau, nom: res.nom || '', droits: res.droits, jeton: res.jeton, expire: Date.now() + DUREE_SESSION_H * 3600 * 1000 }));
   } catch (e) {}
 }
 function effacerSession() {
@@ -135,7 +144,7 @@ function effacerSession() {
 async function verifierMotDePasse(mdp) {
   let r;
   try {
-    r = await fetch(URL_API, { method: 'POST', body: JSON.stringify({ action: 'login', code: mdp }) });
+    r = await fetch(URL_API, { method: 'POST', body: JSON.stringify({ action: 'login', code: mdp, appareil: Nova.appareil() }) });
   } catch (e) {
     throw new Error('serveur injoignable (réseau ou accès au script).');
   }
@@ -147,21 +156,22 @@ async function verifierMotDePasse(mdp) {
 }
 
 function lireNiveau(res) {
-  if (!res || !res.ok || !res.jeton || !RANG[res.niveau]) return null;
+  if (!res || !res.ok || !res.jeton || !RANG[res.niveau] || !Array.isArray(res.droits)) return null;
   return res.niveau;
 }
 
 // Jonction garde le code dans le téléphone (clés "code" et "admin") : on les renseigne aussi
 // pour qu'il s'ouvre déjà connecté.
-function partagerAvecJonction(mdp, n) {
+function partagerAvecJonction(j) {
   try {
-    localStorage.setItem('code', mdp);
-    if (n === 'admin') localStorage.setItem('admin', mdp); else localStorage.removeItem('admin');
+    j = j || {};
+    if (j.code) localStorage.setItem('code', j.code); else localStorage.removeItem('code');
+    if (j.admin) localStorage.setItem('admin', j.admin); else localStorage.removeItem('admin');
   } catch (e) {}
 }
 function oublierJonction() {
   try {
-    ['code', 'admin', 'cache', 'commandesCache', 'termineCache', 'achatsCompte_' + new Date().getFullYear()].forEach(k => localStorage.removeItem(k));
+    ['code', 'admin', 'cache', 'commandesCache', 'termineCache', 'ncCache', 'ncSchemaCache', 'achatsCache', 'achatInitCache', 'achatsCompte_' + new Date().getFullYear()].forEach(k => localStorage.removeItem(k));
   } catch (e) {}
 }
 
@@ -183,8 +193,8 @@ async function connecter(ev) {
     const n = lireNiveau(res);
     if (n) {
       niveau = n;
-      ecrireSession(n, res.jeton);
-      partagerAvecJonction(champ.value, n);
+      ecrireSession(res);
+      partagerAvecJonction(res.jonction);
       champ.value = '';
       msg.textContent = '';
       location.reload();   // la barre d'onglets du bas se reconstruit avec le nouveau niveau
@@ -208,31 +218,37 @@ function deconnecter() {
 }
 
 /* ---------- Affichage ---------- */
+function peut(d) { return !!niveau && Nova.peut(d); }
+
 function dessiner() {
   const badge = document.getElementById('badge');
   badge.className = 'badge' + (niveau ? ' ' + niveau : '');
-  badge.textContent = niveau ? 'Niveau : ' + LIBELLES[niveau] : 'Non connecté';
+  const s = lireSession();
+  badge.textContent = niveau ? (s && s.nom ? 'Connecté : ' + s.nom : 'Niveau : ' + LIBELLES[niveau]) : 'Non connecté';
   document.getElementById('connexion').hidden = !!niveau;
   document.getElementById('consigne').hidden = !!niveau;
   document.getElementById('deconnexion').hidden = !niveau;
   document.getElementById('contenu').hidden = !niveau;
-  const gest = !!niveau && RANG[niveau] >= RANG.gestionnaire;
-  document.getElementById('secNc').hidden = !gest;
-  document.getElementById('secAch').hidden = !gest;
+  const modulesVisibles = MODULES.filter(m => peut(m.droit));
+  const aGroupe = g => modulesVisibles.some(m => m.groupe === g);
+  document.getElementById('secInter').hidden = !aGroupe('inter');
+  document.getElementById('indicateurs').hidden = !peut('intervention');
+  document.getElementById('secNc').hidden = !peut('nc');
+  document.getElementById('secAch').hidden = !peut('achats');
+  document.getElementById('secFour').hidden = !peut('fournisseurs');
+  document.getElementById('secAdmin').hidden = !peut('admin');
   document.getElementById('modules_inter').innerHTML = '';
-  document.querySelectorAll('#gridNc a.action, #gridAch a.action').forEach(a => a.remove());
-  MODULES.forEach(m => {
-    const autorise = !!niveau && RANG[niveau] >= RANG[m.niveauMin || 'technicien'];
-    if (m.masque && !autorise) return;   // invisible pour les niveaux insuffisants (au lieu d'un cadenas)
+  document.querySelectorAll('#gridNc a.action, #gridAch a.action, #gridFour a.action').forEach(a => a.remove());
+  modulesVisibles.forEach(m => {
     const a = document.createElement('a');
-    a.className = 'action' + (m.vedette && autorise ? ' vedette' : '') + (autorise ? '' : ' ferme');
-    a.href = autorise ? m.fichier : '#';
-    a.innerHTML = '<div class="puce">' + Shell.svg(autorise ? m.icone : 'lock', 26) + '</div><b></b><span class="d"></span>';
+    a.className = 'action' + (m.vedette ? ' vedette' : '');
+    a.href = m.fichier;
+    a.innerHTML = '<div class="puce">' + Shell.svg(m.icone, 26) + '</div><b></b><span class="d"></span>';
     a.querySelector('b').textContent = m.titre;
     a.querySelector('.d').textContent = m.description;
-    document.getElementById({ nc: 'gridNc', achats: 'gridAch' }[m.groupe] || 'modules_inter').appendChild(a);
+    document.getElementById({ nc: 'gridNc', achats: 'gridAch', four: 'gridFour' }[m.groupe] || 'modules_inter').appendChild(a);
   });
-  if (niveau) chargerIndicateurs(); else { retirerCartesNc(); retirerCarteAchats(); }
+  if (niveau) chargerIndicateurs(); else { retirerCartesNc(); retirerCarteAchats(); retirerCarteUsers(); }
 }
 
 /* ---------- Indicateurs ---------- */
@@ -250,6 +266,20 @@ function carte(id) {
 function lireAttente() {
   try { return JSON.parse(localStorage.getItem('bonsEnAttente')) || []; } catch (e) { return []; }
 }
+function majFile() {
+  const l = Nova.lireFile();
+  const c = carte('kFile');
+  c.style.display = l.length ? '' : 'none';
+  c.querySelector('b').textContent = l.length;
+  c.querySelector('.lib').textContent = l.length > 1 ? 'Envois en attente (NC, achats, fournisseurs)' : 'Envoi en attente (NC, achat, fournisseur)';
+  const aide = c.querySelector('.aide');
+  const err = l.find(x => x.erreur);
+  c.classList.toggle('alerte', l.length > 0);
+  aide.hidden = !l.length;
+  aide.textContent = err ? 'Refusé : ' + err.erreur : 'Appuie pour renvoyer';
+  c.onclick = l.length ? () => { aide.textContent = 'Envoi en cours...'; Nova.viderFile().then(majFile); } : null;
+}
+document.addEventListener('nova:file', majFile);
 let renvoiEnCours = false;
 function majAttente(message) {
   const n = lireAttente().length;
@@ -330,7 +360,7 @@ function carteNc(type, lib, periode) {
   return c;
 }
 async function chargerNc() {
-  if (!niveau || RANG[niveau] < RANG.gestionnaire) { retirerCartesNc(); return; }
+  if (!peut('nc')) { retirerCartesNc(); return; }
   const cartes = {};
   NC_CARTES.forEach(x => { cartes[x.type] = { total: carteNc(x.type, x.lib, 'tout'), jours: carteNc(x.type, x.lib, '30') }; });
   try {
@@ -348,7 +378,7 @@ function retirerCarteAchats() {
   const c = document.getElementById('kAch'); if (c) c.remove();
 }
 async function chargerAchats() {
-  if (!niveau || RANG[niveau] < RANG.gestionnaire) { retirerCarteAchats(); return; }
+  if (!peut('achats')) { retirerCarteAchats(); return; }
   let c = document.getElementById('kAch');
   if (!c) {
     c = document.createElement('div');
@@ -374,11 +404,42 @@ async function chargerAchats() {
     try { localStorage.setItem('achatsCompte_' + an, String(n)); } catch (e) {}
   } catch (e) { if (memo === null) c.querySelector('b').textContent = '–'; }
 }
+/* ---------- Utilisateurs (administrateur) : voyant orange en cas de nouvel appareil ---------- */
+function retirerCarteUsers() {
+  const c = document.getElementById('kUsers'); if (c) c.remove();
+}
+async function chargerUsers() {
+  if (!peut('admin')) { retirerCarteUsers(); return; }
+  let c = document.getElementById('kUsers');
+  if (!c) {
+    c = document.createElement('div');
+    c.id = 'kUsers';
+    c.className = 'kpi cliquable';
+    c.setAttribute('role', 'link');
+    c.tabIndex = 0;
+    c.innerHTML = '<b>…</b><span class="lib">Utilisateurs actifs</span><span class="aide" hidden></span>';
+    const aller = () => { location.href = 'utilisateurs.html'; };
+    c.onclick = aller;
+    c.onkeydown = e => { if (e.key === 'Enter') aller(); };
+    document.getElementById('gridAdmin').appendChild(c);
+  }
+  try {
+    const r = await Nova.api('usersResume', null, 10000);
+    c.querySelector('b').textContent = r.actifs;
+    const aide = c.querySelector('.aide');
+    c.classList.toggle('alerte', r.nouveaux.length > 0);
+    aide.hidden = false;
+    aide.textContent = r.nouveaux.length
+      ? 'Nouvel appareil : ' + [...new Set(r.nouveaux.map(a => a.nom))].join(', ')
+      : 'Droits, codes et appareils';
+  } catch (e) { c.querySelector('b').textContent = '–'; }
+}
 function chargerIndicateurs() {
   chargerAchats();
-  chargerCommandes();
-  majAttente();
+  if (peut('intervention')) { chargerCommandes(); majAttente(); }
+  majFile();
   chargerNc();
+  chargerUsers();
 }
 
 

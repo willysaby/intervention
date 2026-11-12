@@ -68,7 +68,8 @@ const COLONNES = [
   { cle: 'nc', lib: 'Non-conformité', long: true },
   { cle: 'action', lib: 'Action', long: true },
   { cle: 'ofnc', lib: 'OF NC' },
-  { cle: 'cloture', lib: 'Clôture dossier', date: true, etat: true }
+  { cle: 'cloture', lib: 'Clôture dossier', date: true, etat: true },
+  { cle: 'saisiPar', lib: 'Saisi par' }
 ];
 let donnees = null;
 
@@ -154,14 +155,29 @@ function appliquerUrl() {
 }
 
 async function charger() {
-  if (!Nova.exiger('gestionnaire')) return;
+  if (!Nova.exiger('nc')) return;
   document.getElementById('infos').textContent = 'Chargement...';
+  let horsLigne = false;
   try {
     donnees = await Nova.api('ncListe');
-  } catch (e) { montrerErreur(e.message); return; }
+    try { localStorage.setItem('ncCache', JSON.stringify(donnees)); } catch (x) {}
+  } catch (e) {
+    if (e.code === 'reseau') { try { donnees = JSON.parse(localStorage.getItem('ncCache')); horsLigne = !!donnees; } catch (x) {} }
+    if (!donnees) { montrerErreur(e.message); return; }
+  }
   appliquerUrl();
   dessiner();
+  if (horsLigne) document.getElementById('infos').textContent += ' · hors ligne : liste enregistrée sur l\'appareil';
+  attenteNc();
 }
+function attenteNc() {
+  let b = document.getElementById('attenteNc');
+  if (!b) { b = document.createElement('div'); b.id = 'attenteNc'; b.style.cssText = 'background:#fff4e5;border:1px solid #f0c987;color:#8a5200;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:14px'; document.getElementById('infos').before(b); }
+  const l = Nova.lireFile().filter(x => x.action === 'ncAjouter');
+  b.hidden = !l.length;
+  b.textContent = l.length + (l.length > 1 ? ' non-conformités en attente d\'envoi' : ' non-conformité en attente d\'envoi') + ' : elles partiront dès le retour du réseau.' + (l.some(x => x.erreur) ? ' ⚠ Une a été refusée : ' + l.find(x => x.erreur).erreur : '');
+}
+document.addEventListener('nova:file', e => { attenteNc(); if (e.detail && e.detail.envoyes) charger(); });
 
 ['fType', 'fDu', 'fAu', 'fEtat'].forEach(id => document.getElementById(id).addEventListener('change', () => donnees && dessiner()));
 document.getElementById('recherche').addEventListener('input', () => donnees && dessiner());

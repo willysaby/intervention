@@ -12,6 +12,8 @@
     moon: '<path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
     cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M3 4h2l2.4 11h11.2l2-8H6.2"/>',
+    tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><path d="M8 8h.01"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14a6.5 6.5 0 0 1 3 6"/>',
     wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.1L3 17.7 6.3 21l6.3-6.3a4 4 0 0 0 5.1-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
     alert: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
@@ -22,30 +24,35 @@
   function session() {
     try {
       const s = JSON.parse(localStorage.getItem('sessionAccueil'));
-      if (s && RANG[s.niveau] && s.jeton && s.expire > Date.now()) return s;
+      if (s && RANG[s.niveau] && Array.isArray(s.droits) && s.jeton && s.expire > Date.now()) return s;
     } catch (e) {}
     return null;
   }
+  function peut(droit) {
+    const s = session();
+    return !!s && (s.droits.indexOf('admin') >= 0 || s.droits.indexOf(droit) >= 0);
+  }
   const ONGLETS = [
-    { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', min: 'technicien', fichiers: ['jonction.html'] },
-    { id: 'bon', lib: 'Vierge', href: 'intervention.html', ic: 'plus', min: 'technicien', fichiers: ['intervention.html'] },
-    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', min: null, fichiers: ['', 'index.html', 'nc.html', 'nc-ajout.html', 'achats.html', 'achat-nouveau.html'] },
-    { id: 'commandes', lib: 'Commande', href: 'commandes.html', ic: 'list', min: 'technicien', fichiers: ['commandes.html'] },
-    { id: 'finies', lib: 'Finies', href: 'termines.html', ic: 'check', min: 'gestionnaire', fichiers: ['termines.html'] }
+    { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', droit: 'jonction', fichiers: ['jonction.html'] },
+    { id: 'bon', lib: 'Vierge', href: 'intervention.html', ic: 'plus', droit: 'intervention', fichiers: ['intervention.html'] },
+    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', droit: null, fichiers: ['', 'index.html'] },
+    { id: 'commandes', lib: 'Commande', href: 'commandes.html', ic: 'list', droit: 'intervention', fichiers: ['commandes.html'] },
+    { id: 'finies', lib: 'Finies', href: 'termines.html', ic: 'check', droit: 'gestion', fichiers: ['termines.html'] }
   ];
-  // Menu des gestionnaires et administrateurs
+  // Menu des gestionnaires et administrateurs : seuls les onglets auxquels le compte a droit apparaissent
   const ONGLETS_GEST = [
-    { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', fichiers: ['jonction.html'] },
-    { id: 'inter', lib: 'Intervention', href: 'commandes.html', ic: 'wrench', fichiers: ['commandes.html', 'intervention.html', 'termines.html'] },
-    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', fichiers: ['', 'index.html'] },
-    { id: 'achats', lib: 'Achats', href: 'achats.html', ic: 'cart', fichiers: ['achats.html', 'achat-nouveau.html'] },
-    { id: 'nc', lib: 'NC', href: 'nc.html', ic: 'alert', fichiers: ['nc.html', 'nc-ajout.html'] }
+    { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', droit: 'jonction', fichiers: ['jonction.html'] },
+    { id: 'inter', lib: 'Intervention', href: 'commandes.html', ic: 'wrench', droit: ['intervention', 'gestion'], fichiers: ['commandes.html', 'intervention.html', 'termines.html'] },
+    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', droit: null, fichiers: ['', 'index.html', 'utilisateurs.html', 'fournisseurs.html'] },
+    { id: 'achats', lib: 'Achats', href: 'achats.html', ic: 'cart', droit: 'achats', fichiers: ['achats.html', 'achat-nouveau.html'] },
+    { id: 'nc', lib: 'NC', href: 'nc.html', ic: 'alert', droit: 'nc', fichiers: ['nc.html', 'nc-ajout.html'] }
   ];
-  function menuGest() { const s = session(); return !!s && RANG[s.niveau] >= RANG.gestionnaire; }
+  function menuGest() { return ['gestion', 'nc', 'achats', 'fournisseurs', 'admin'].some(peut); }
+  function autorise(o) { return !o.droit || [].concat(o.droit).some(peut); }
   const SOUS_TITRES = { accueil: 'Les interventions Novafit', jonction: 'Paramètres de jonction', bon: 'Bon d\'intervention vierge',
     commandes: 'Bon d\'intervention de commande', finies: 'Interventions finies', inter: 'Interventions', achats: 'Achats fournisseurs', nc: 'Non-conformités' };
 
-  const TITRES_PAGES = { 'nc.html': 'Non-conformités', 'nc-ajout.html': 'Ajouter une non-conformité', 'achats.html': 'Achats fournisseurs', 'achat-nouveau.html': 'Nouvelle commande' };
+  const TITRES_PAGES = { 'nc.html': 'Non-conformités', 'nc-ajout.html': 'Ajouter une non-conformité', 'achats.html': 'Achats fournisseurs', 'achat-nouveau.html': 'Nouvelle commande', 'fournisseurs.html': 'Annuaire des fournisseurs', 'utilisateurs.html': 'Utilisateurs et droits' };
   function fichierCourant() { return decodeURIComponent(location.pathname.split('/').pop()); }
   function ongletActif() {
     const f = fichierCourant();
@@ -90,8 +97,9 @@
     }
     const nav = document.createElement('nav');
     nav.className = 'barreOnglets';
-    (menuGest() ? ONGLETS_GEST : ONGLETS).forEach(function (o) {
-      const ok = !o.min || (s && RANG[s.niveau] >= RANG[o.min]);
+    const liste = menuGest() ? ONGLETS_GEST.filter(function (o) { return !o.droit || autorise(o); }) : ONGLETS;
+    liste.forEach(function (o) {
+      const ok = autorise(o);
       const a = document.createElement('a');
       a.href = ok ? o.href : './';
       a.className = (o.id === actif ? 'on ' : '') + (ok ? '' : 'ferme');

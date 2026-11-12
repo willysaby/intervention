@@ -82,7 +82,9 @@
     </div>
 
     <div id="message" role="status"></div>
-    <button type="submit" class="btn vert envoyer" id="envoyer">Valider et envoyer la commande</button>
+    <button type="submit" class="btn vert envoyer" id="envoyer">Prévisualiser la commande</button>
+    <button type="button" class="btn envoyer" id="btnFile" hidden style="margin-top:8px">Pas de réseau : garder la commande et l'envoyer plus tard</button>
+    <p class="aide" style="text-align:center">Tu verras le PDF avant l'envoi. Rien n'est enregistré ni envoyé tant que tu n'as pas cliqué sur « Envoyer la commande ».</p>
   </form>
 </div>
 
@@ -142,10 +144,17 @@ function surFournisseur() {
   }
 }
 
+let hors = false;
 async function init() {
-  if (!Nova.exiger('gestionnaire')) return;
+  if (!Nova.exiger('achats')) return;
   let r;
-  try { r = await Nova.api('achatInit', null, 20000); } catch (e) { Nova.bloquer(e.message); return; }
+  try {
+    r = await Nova.api('achatInit', null, 20000);
+    try { localStorage.setItem('achatInitCache', JSON.stringify(r)); } catch (x) {}
+  } catch (e) {
+    if (e.code === 'reseau') { try { r = JSON.parse(localStorage.getItem('achatInitCache')); } catch (x) {} if (r) { r.numero = 'attribué à l\'envoi'; hors = true; } }
+    if (!r) { Nova.bloquer(e.message); return; }
+  }
   fournisseurs = r.fournisseurs;
   r.fournisseurs.forEach(f => { const o = document.createElement('option'); o.value = f.nom; el('listeFourn').appendChild(o); });
   el('numero').value = r.numero;
@@ -157,46 +166,86 @@ async function init() {
   idEnvoi = nouvelId();
   ajouterLigne();
   calculer();
+  if (hors) { msg('Pas de réseau : liste des fournisseurs enregistrée utilisée. Tu pourras garder la commande sur l\'appareil ; elle partira au retour du réseau.', 'ko'); montrerFile(); }
 }
+function montrerFile() { el('btnFile').hidden = false; }
 
 el('btnLigne').onclick = () => { ajouterLigne().querySelector('.ref').focus(); };
 el('fournisseur').addEventListener('input', surFournisseur);
 el('fournisseur').addEventListener('change', surFournisseur);
 el('tva').addEventListener('input', calculer);
 
-el('formulaire').addEventListener('submit', async ev => {
-  ev.preventDefault();
-  if (enCours) return;
+function collecter() {
   const lignes = [...document.querySelectorAll('.ligneCmd')].map(l => ({
     ref: l.querySelector('.ref').value.trim(), desc: l.querySelector('.desc').value.trim(),
     qte: l.querySelector('.qte').value.trim(), pu: l.querySelector('.pu').value.trim()
   })).filter(l => l.ref || l.desc || l.pu);
-  if (!el('fournisseur').value.trim()) { msg('Le fournisseur est obligatoire.', 'ko'); el('fournisseur').focus(); return; }
-  if (!el('destinataire').value.trim()) { msg('L\'email du fournisseur est obligatoire.', 'ko'); el('destinataire').focus(); return; }
-  if (!lignes.length) { msg('Ajoute au moins une ligne de commande.', 'ko'); return; }
-  if (lignes.some(l => !l.desc)) { msg('Chaque ligne doit avoir une désignation.', 'ko'); return; }
+  if (!el('fournisseur').value.trim()) { msg('Le fournisseur est obligatoire.', 'ko'); el('fournisseur').focus(); return null; }
+  if (!el('destinataire').value.trim()) { msg('L\'email du fournisseur est obligatoire.', 'ko'); el('destinataire').focus(); return null; }
+  if (!lignes.length) { msg('Ajoute au moins une ligne de commande.', 'ko'); return null; }
+  if (lignes.some(l => !l.desc)) { msg('Chaque ligne doit avoir une désignation.', 'ko'); return null; }
+  const f = fournisseurConnu();
+  return {
+    idEnvoi: idEnvoi, fournisseur: el('fournisseur').value.trim(), destinataire: el('destinataire').value.trim(),
+    contact: f ? f.contact : '', date: el('date').value, reglement: el('reglement').value.trim(), tva: el('tva').value,
+    lignes: lignes, objet: el('objet').value.trim(), message: el('message2').value
+  };
+}
+
+// Étape 1 : prévisualiser. Le PDF est fabriqué sans rien enregistrer : pas de numéro consommé, pas de mail.
+el('formulaire').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  if (enCours) return;
+  const donnees = collecter();
+  if (!donnees) return;
+  if (!navigator.onLine) { montrerFile(); msg('Pas de réseau : l\'aperçu est impossible. Utilise « garder la commande et l\'envoyer plus tard ».', 'ko'); return; }
   enCours = true;
   const btn = el('envoyer'); btn.disabled = true;
-  msg('Création du PDF et envoi du mail...', '');
-  const f = fournisseurConnu();
+  msg('Préparation de l\'aperçu...', '');
   try {
-    const r = await Nova.api('achatCreer', {
-      idEnvoi: idEnvoi, fournisseur: el('fournisseur').value.trim(), destinataire: el('destinataire').value.trim(),
-      contact: f ? f.contact : '', date: el('date').value, reglement: el('reglement').value.trim(), tva: el('tva').value,
-      lignes: lignes, objet: el('objet').value.trim(), message: el('message2').value
-    }, 90000);
+    const r = await Nova.api('achatApercu', donnees, 60000);
+    msg('', '');
+    Nova.ouvrirVisio({
+      donnees: r.donnees,
+      titre: 'Aperçu de la commande ' + r.numero + ' · rien n\'est encore envoyé',
+      action: { texte: 'Envoyer la commande', fn: () => envoyer(donnees) }
+    });
+  } catch (e) {
+    if (e.code === 'reseau') { montrerFile(); msg('Réseau absent ou trop faible : aperçu impossible. Tu peux garder la commande sur l\'appareil, elle partira au retour du réseau.', 'ko'); }
+    else msg(e.message, 'ko');
+  }
+  enCours = false; btn.disabled = false;
+});
+el('btnFile').onclick = () => {
+  const donnees = collecter();
+  if (!donnees) return;
+  Nova.garderEnFile('achatCreer', donnees, 'Commande ' + donnees.fournisseur);
+  try { localStorage.setItem('flashAchats', JSON.stringify({ ts: Date.now(), type: 'ko', texte: 'Commande gardée sur l\'appareil : elle partira dès le retour du réseau (numéro attribué à l\'envoi).' })); } catch (e) {}
+  location.href = 'achats.html';
+};
+
+// Étape 2 : valider. La commande est enregistrée, le numéro attribué et le mail part.
+async function envoyer(donnees) {
+  if (enCours) return;
+  enCours = true;
+  const bouton = document.getElementById('vAction');
+  bouton.disabled = true; bouton.textContent = 'Envoi en cours...';
+  try {
+    const r = await Nova.api('achatCreer', donnees, 90000);
     try {
       localStorage.setItem('flashAchats', JSON.stringify({ ts: Date.now(), type: r.avertissement ? 'ko' : 'ok',
-        texte: r.avertissement ? 'Commande ' + r.numero + ' : ' + r.avertissement : 'Commande ' + r.numero + ' envoyée à ' + el('fournisseur').value.trim() + '.' }));
+        texte: r.avertissement ? 'Commande ' + r.numero + ' : ' + r.avertissement : 'Commande ' + r.numero + ' envoyée à ' + donnees.fournisseur + '.' }));
     } catch (e) {}
     location.href = 'achats.html';
   } catch (e) {
+    history.back();   // retour au formulaire, saisie conservée
     msg(e.code === 'reseau'
       ? 'Pas de réponse du serveur. Vérifie la liste avant de recommencer : si la commande y figure, elle est bien partie. (Tu peux aussi revalider : elle ne sera pas créée en double.)'
       : e.message, 'ko');
-    enCours = false; btn.disabled = false;
+    bouton.disabled = false; bouton.textContent = 'Envoyer la commande';
+    enCours = false;
   }
-});
+}
 init();
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 </script>

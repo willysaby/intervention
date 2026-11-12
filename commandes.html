@@ -82,10 +82,16 @@ function dessiner(horsLigne) {
 
 function ouvrir(c) {
   const url = 'intervention.html?doc=' + encodeURIComponent(c.id) + '&cd=' + encodeURIComponent(c.cd) + '&client=' + encodeURIComponent(c.client);
+  let lecture = null;   // contact + email lus dans le PDF (sans IA)
   Nova.ouvrirVisio({
     id: c.id,
     titre: (c.cd ? c.cd : '') + (c.client ? ' · ' + c.client : ''),
-    action: { texte: 'Faire le bon d\'intervention', fn: () => { location.href = url; } }
+    surDocument: bytes => { lecture = Nova.extraireContact(bytes); },
+    action: { texte: 'Faire le bon d\'intervention', fn: async () => {
+      let x = {};
+      try { if (lecture) x = await Promise.race([lecture, new Promise(r => setTimeout(() => r({}), 3000))]) || {}; } catch (e) {}
+      location.href = url + (x.contact ? '&contact=' + encodeURIComponent(x.contact) : '') + (x.email ? '&email=' + encodeURIComponent(x.email) : '');
+    } }
   });
 }
 
@@ -116,7 +122,7 @@ async function charger() {
   }
 }
 
-if (Nova.exiger('technicien')) {
+if (Nova.exiger('intervention')) {
   document.getElementById('btnActualiser').onclick = charger;
   document.getElementById('recherche').addEventListener('input', () => dessiner(false));
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

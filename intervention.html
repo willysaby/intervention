@@ -233,6 +233,8 @@ async function init() {
   if (DOC_ID) {
     document.getElementById('numeroCommande').value = PARAMS.get('cd') || '';
     document.getElementById('client').value = PARAMS.get('client') || '';
+    document.getElementById('nomSignataire').value = PARAMS.get('contact') || '';
+    document.getElementById('emailClient').value = PARAMS.get('email') || '';
     const retour = document.getElementById('retour');
     retour.href = 'commandes.html';
     retour.textContent = '← Commandes';
@@ -296,6 +298,21 @@ function remplirTechniciens(liste) {
     const nom = String(t);
     return '<label class="tech"><input type="checkbox" value="' + nom.replace(/"/g, '&quot;') + '"><span>' + nom + '</span></label>';
   }).join('');
+  preselectionnerTechnicien();
+}
+
+// Compte personnel : coche d'office le technicien du même nom (prénom et nom, dans n'importe quel ordre).
+// Ne touche à rien si la personne a déjà coché quelqu'un, ni si aucun nom ne correspond.
+function preselectionnerTechnicien() {
+  const s = Nova.session && Nova.session();
+  if (!s || !s.nom) return;
+  const mots = x => Nova.norm(x).split(/[^a-z0-9]+/).filter(Boolean);
+  const siens = mots(s.nom);
+  if (!siens.length) return;
+  const boites = [...document.querySelectorAll('#techniciens input')];
+  if (boites.some(b => b.checked)) return;
+  const trouves = boites.filter(b => { const m = mots(b.value); return m.length && siens.every(w => m.indexOf(w) >= 0); });
+  if (trouves.length === 1) trouves[0].checked = true;
 }
 
 /* ---------- Heures (pas de 15 minutes) ---------- */

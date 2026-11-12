@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Fournisseurs</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="commun.css">
+<style>
+  .page { max-width: 1040px; }
+  .recherche { width: 100%; padding: 14px; font-size: 17px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); }
+  .pills { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+  .pill { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; }
+  .pill.on { background: var(--accentbg); color: var(--lien); border-color: var(--lien); }
+  .nuage { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin: 14px 0 6px; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+  .nuage button { border: 0; background: none; color: var(--lien); cursor: pointer; padding: 2px 0; font-family: inherit; font-weight: 600; }
+  .nuage button.on { background: var(--accentbg); border-radius: 8px; padding: 2px 8px; }
+  .nuage .t { color: var(--mute); font-size: 13px; width: 100%; }
+  .nb { color: var(--mute); font-size: 14px; margin: 10px 0; }
+  .liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; }
+  @media (max-width: 520px) { .liste { grid-template-columns: 1fr; } }
+  .four { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
+  .four h3 { margin: 0 0 6px; font-size: 17px; display: flex; gap: 8px; justify-content: space-between; align-items: baseline; }
+  .four h3 small { font-size: 12px; font-weight: 700; color: var(--okink); background: var(--okbg); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tag { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--pastille); color: var(--mute); }
+  .tag.metier { background: var(--accentbg); color: var(--lien); }
+  .tag.hit { background: var(--okbg); color: var(--okink); }
+  .contact { font-size: 14px; color: var(--mute); margin-top: 10px; line-height: 1.6; overflow-wrap: anywhere; }
+  .contact a { color: var(--lien); font-weight: 600; text-decoration: none; }
+  .notes { font-size: 13px; color: var(--mute); margin-top: 6px; font-style: italic; }
+  details.ajout { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; margin: 0 0 14px; }
+  details.ajout summary { font-weight: 700; cursor: pointer; color: var(--lien); }
+  .grille2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
+  .grille2 label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  #msgAjout { font-weight: 600; margin-top: 10px; min-height: 1.2em; }
+  #msgAjout.ko { color: var(--koink); } #msgAjout.ok { color: var(--okink); }
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <div class="haut"><a href="./">← Accueil</a></div>
+  <details class="ajout" id="ajout">
+    <summary>+ Ajouter un fournisseur</summary>
+    <form id="formAjout" autocomplete="off">
+      <div class="grille2">
+        <div><label for="aNom">Fournisseur *</label><input class="champ" id="aNom"></div>
+        <div><label for="aMetier">Métier</label><input class="champ" id="aMetier" list="listeMetiers" placeholder="Caoutchouc, silicone, métaux…"><datalist id="listeMetiers"></datalist></div>
+        <div><label for="aType">Type</label><select class="champ" id="aType"><option>Matière première</option><option>Produit fini</option><option>Autre</option></select></div>
+        <div style="grid-column:1/-1"><label for="aTags">Tags (séparés par des virgules)</label><input class="champ" id="aTags" placeholder="bande modulaire, plastique, polyéthylène"></div>
+        <div><label for="aContact">Contact</label><input class="champ" id="aContact"></div>
+        <div><label for="aTel">Téléphone</label><input class="champ" id="aTel" inputmode="tel"></div>
+        <div><label for="aEmail">Email</label><input class="champ" id="aEmail" inputmode="email"></div>
+        <div style="grid-column:1/-1"><label for="aNotes">Notes</label><input class="champ" id="aNotes"></div>
+      </div>
+      <button type="submit" class="btn vert" style="margin-top:12px">Enregistrer le fournisseur</button>
+      <div id="msgAjout"></div>
+    </form>
+  </details>
+  <input class="recherche" id="q" type="search" placeholder="Que cherches-tu ? ex : modulaire plastique" autocomplete="off">
+  <div class="pills" id="pills"></div>
+  <div class="nuage" id="nuage" hidden></div>
+  <div id="erreur" class="erreurPage" hidden></div>
+  <div class="nb" id="nb"></div>
+  <div class="liste" id="liste"></div>
+</div>
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script src="shell.js"></script>
+<script>
+let tous = [], metier = '';
+const el = id => document.getElementById(id);
+const norm = s => Nova.norm(s);
+const mots = s => norm(s).split(/[^a-z0-9]+/).filter(Boolean);
+
+function distance(a, b) {   // Levenshtein, borné à 2
+  if (Math.abs(a.length - b.length) > 1) return 2;
+  const m = a.length, n = b.length; let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+  return prev[n];
+}
+function scoreMot(f, t) {
+  let sc = 0;
+  const test = (liste, pts) => {
+    for (const w of liste) {
+      if (w === t) return pts;
+      if (t.length >= 3 && (w.indexOf(t) === 0 || (t.length >= 4 && w.indexOf(t) > 0))) return pts - 1;
+      if (t.length >= 5 && w.length >= 4 && distance(w, t) <= 1) return pts - 1;
+    }
+    return 0;
+  };
+  sc = Math.max(test(f._tags, 3), test(f._nom, 3), test(f._metier, 2), test(f._type, 1), test(f._notes, 1));
+  return sc;
+}
+function preparer(l) {
+  l._tags = l.tags.flatMap(mots); l._nom = mots(l.nom); l._metier = mots(l.metier); l._type = mots(l.type); l._notes = mots(l.notes + ' ' + l.contact);
+  return l;
+}
+
+function resultats() {
+  const q = mots(el('q').value);
+  let liste = tous.filter(f => !metier || norm(f.metier) === norm(metier));
+  if (!q.length) return liste.map(f => ({ f, n: 0, sc: 0 })).sort((a, b) => a.f.nom.localeCompare(b.f.nom, 'fr'));
+  const out = [];
+  liste.forEach(f => {
+    let sc = 0, n = 0;
+    q.forEach(t => { const s = scoreMot(f, t); if (s > 0) { sc += s; n++; } });
+    if (n) out.push({ f, n, sc: sc + n * 5 });
+  });
+  return out.sort((a, b) => b.sc - a.sc || a.f.nom.localeCompare(b.f.nom, 'fr'));
+}
+
+function dessiner() {
+  const q = mots(el('q').value);
+  // pastilles de métiers
+  const metiers = [...new Set(tous.map(f => f.metier).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const pills = el('pills'); pills.innerHTML = '';
+  [''].concat(metiers).forEach(m => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'pill' + (m === metier ? ' on' : ''); b.textContent = m || 'Tous les métiers';
+    b.onclick = () => { metier = m; dessiner(); };
+    pills.appendChild(b);
+  });
+  const dl = el('listeMetiers'); dl.innerHTML = ''; metiers.forEach(m => { const o = document.createElement('option'); o.value = m; dl.appendChild(o); });
+  // nuage de tags (les plus utilisés)
+  const compte = {};
+  tous.filter(f => !metier || norm(f.metier) === norm(metier)).forEach(f => f.tags.forEach(t => { const k = norm(t); if (!k) return; (compte[k] = compte[k] || { t, n: 0 }).n++; }));
+  const top = Object.values(compte).sort((a, b) => b.n - a.n || a.t.localeCompare(b.t, 'fr')).slice(0, 40);
+  const nuage = el('nuage'); nuage.innerHTML = '';
+  nuage.hidden = top.length === 0;
+  if (top.length) {
+    const t = document.createElement('div'); t.className = 't'; t.textContent = 'Tags les plus utilisés : touche-en un pour chercher'; nuage.appendChild(t);
+    const max = top[0].n;
+    top.slice().sort((a, b) => a.t.localeCompare(b.t, 'fr')).forEach(x => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = x.t;
+      b.style.fontSize = (14 + Math.round(10 * x.n / max)) + 'px';
+      b.className = q.indexOf(norm(x.t)) >= 0 ? 'on' : '';
+      b.onclick = () => { const cur = el('q').value.trim(); const k = norm(x.t); el('q').value = norm(cur).indexOf(k) >= 0 ? cur.split(/\s+/).filter(w => norm(w) !== k).join(' ') : (cur + ' ' + x.t).trim(); dessiner(); };
+      nuage.appendChild(b);
+    });
+  }
+  // résultats
+  const res = resultats();
+  el('nb').textContent = tous.length === 0 ? 'Aucun fournisseur dans l\'annuaire pour l\'instant.' : res.length + (res.length > 1 ? ' fournisseurs' : ' fournisseur') + (q.length ? ' pour « ' + el('q').value.trim() + ' »' : '');
+  const zone = el('liste'); zone.innerHTML = '';
+  res.slice(0, 200).forEach(({ f, n }) => {
+    const c = document.createElement('div'); c.className = 'four';
+    const h = document.createElement('h3'); const nom = document.createElement('span'); nom.textContent = f.nom; h.appendChild(nom);
+    if (q.length > 1) { const s = document.createElement('small'); s.textContent = n + '/' + q.length + ' mots'; h.appendChild(s); }
+    c.appendChild(h);
+    const meta = document.createElement('div'); meta.className = 'meta';
+    [f.metier && ['metier', f.metier], f.type && ['', f.type]].filter(Boolean).forEach(([k, t]) => { const s = document.createElement('span'); s.className = 'tag ' + k; s.textContent = t; meta.appendChild(s); });
+    f.tags.forEach(t => { const s = document.createElement('span'); s.className = 'tag' + (q.some(w => scoreMot({ _tags: mots(t), _nom: [], _metier: [], _type: [], _notes: [] }, w) > 0) ? ' hit' : ''); s.textContent = t; meta.appendChild(s); });
+    c.appendChild(meta);
+    const ct = document.createElement('div'); ct.className = 'contact';
+    const ligne = [];
+    if (f.contact) ligne.push(document.createTextNode(f.contact));
+    if (f.tel) { const a = document.createElement('a'); a.href = 'tel:' + f.tel.replace(/[^\d+]/g, ''); a.textContent = f.tel; ligne.push(a); }
+    if (f.email) { const a = document.createElement('a'); a.href = 'mailto:' + f.email; a.textContent = f.email; ligne.push(a); }
+    ligne.forEach((n2, i) => { if (i) ct.appendChild(document.createTextNode(' · ')); ct.appendChild(n2); });
+    if (ligne.length) c.appendChild(ct);
+    if (f.notes) { const n3 = document.createElement('div'); n3.className = 'notes'; n3.textContent = f.notes; c.appendChild(n3); }
+    zone.appendChild(c);
+  });
+}
+
+async function charger() {
+  if (!Nova.exiger('fournisseurs')) return;
+  try { const memo = JSON.parse(localStorage.getItem('fournisseursCache')); if (Array.isArray(memo)) { tous = memo.map(preparer); dessiner(); } } catch (e) {}
+  try {
+    const r = await Nova.api('fourListe', null, 20000);
+    tous = r.lignes.map(preparer);
+    try { localStorage.setItem('fournisseursCache', JSON.stringify(r.lignes)); } catch (e) {}
+    el('erreur').hidden = true;
+    dessiner();
+  } catch (e) { if (!tous.length) { el('erreur').textContent = e.message; el('erreur').hidden = false; } }
+}
+el('q').addEventListener('input', dessiner);
+el('formAjout').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const m = el('msgAjout'); m.className = ''; m.textContent = 'Enregistrement...';
+  try {
+    const rf = await Nova.envoyerOuGarder('fourAjouter', { fournisseur: { nom: el('aNom').value, metier: el('aMetier').value, type: el('aType').value, tags: el('aTags').value, contact: el('aContact').value, tel: el('aTel').value, email: el('aEmail').value, notes: el('aNotes').value } }, 'Fournisseur ' + el('aNom').value, 20000);
+    m.className = 'ok'; m.textContent = rf.enAttente ? '✓ Pas de réseau : fournisseur gardé sur l\'appareil, il partira au retour du réseau.' : '✓ Fournisseur ajouté.';
+    el('formAjout').reset();
+    if (!rf.enAttente) await charger();
+  } catch (e) { m.className = 'ko'; m.textContent = e.message; }
+});
+charger();
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
