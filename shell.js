@@ -16,6 +16,10 @@
     users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14a6.5 6.5 0 0 1 3 6"/>',
     wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.1L3 17.7 6.3 21l6.3-6.3a4 4 0 0 0 5.1-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
     alert: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>',
+    chevron: '<path d="M9 6l6 6-6 6"/>',
+    camera: '<path d="M4 8h3l1.6-2.2A1 1 0 0 1 9.4 5.4h5.2a1 1 0 0 1 .8.4L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 9"/>',
+    x: '<path d="M6 6l12 12M18 6L6 18"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
   };
   function svg(nom, taille) {
@@ -34,9 +38,8 @@
   }
   const ONGLETS = [
     { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', droit: 'jonction', fichiers: ['jonction.html'] },
-    { id: 'bon', lib: 'Vierge', href: 'intervention.html', ic: 'plus', droit: 'intervention', fichiers: ['intervention.html'] },
+    { id: 'inter', lib: 'Intervention', href: 'commandes.html', ic: 'wrench', droit: 'intervention', fichiers: ['commandes.html', 'intervention.html'] },
     { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', droit: null, fichiers: ['', 'index.html'] },
-    { id: 'commandes', lib: 'Commande', href: 'commandes.html', ic: 'list', droit: 'intervention', fichiers: ['commandes.html'] },
     { id: 'finies', lib: 'Finies', href: 'termines.html', ic: 'check', droit: 'gestion', fichiers: ['termines.html'] }
   ];
   // Menu des gestionnaires et administrateurs : seuls les onglets auxquels le compte a droit apparaissent
@@ -58,8 +61,6 @@
     const f = fichierCourant();
     if (menuGest()) return (ONGLETS_GEST.find(o => o.fichiers.indexOf(f) >= 0) || ONGLETS_GEST[2]).id;
     let id = (ONGLETS.find(o => o.fichiers.indexOf(f) >= 0) || ONGLETS.find(function (o) { return o.id === 'accueil'; })).id;
-    // Un bon ouvert depuis une commande reste dans l'onglet Commandes
-    if (id === 'bon' && new URLSearchParams(location.search).get('doc')) id = 'commandes';
     return id;
   }
   function themeEffectif() {
@@ -69,6 +70,7 @@
   }
 
   function construire() {
+    document.querySelectorAll('.rond[data-ic]').forEach(function (e) { e.innerHTML = svg(e.getAttribute('data-ic'), 28); });
     const actif = ongletActif();
     if (actif !== 'jonction') document.body.classList.add('avecBarre');
     if (actif !== 'jonction') document.body.classList.add('avecEntete');

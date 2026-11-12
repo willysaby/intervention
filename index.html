@@ -35,6 +35,12 @@
   a.action .puce { width: 52px; height: 52px; border-radius: 16px; background: var(--accentbg); color: var(--lien); display: grid; place-items: center; margin-bottom: 14px; }
   a.action b { display: block; font-size: 16px; overflow-wrap: break-word; }
   a.action span.d { display: block; margin-top: 4px; color: var(--mute); font-size: 15px; }
+  a.gros { display: flex; align-items: center; gap: 16px; width: 100%; background: var(--vert); color: #fff; border-radius: 22px; padding: 20px; text-decoration: none; box-shadow: 0 6px 18px rgba(14,144,98,.25); margin-bottom: 12px; }
+  a.gros.fonce { background: #0b5d45; }
+  a.gros .pic { flex: none; width: 56px; height: 56px; border-radius: 16px; background: rgba(255,255,255,.18); display: grid; place-items: center; }
+  a.gros .tx { min-width: 0; } a.gros .tx b { display: block; font-size: 22px; } a.gros .tx span { display: block; font-size: 14px; opacity: .9; margin-top: 3px; }
+  a.gros .fl { margin-left: auto; opacity: .85; display: flex; }
+  a.gros .pastille { margin-left: auto; background: #fff; color: #0b5d45; border-radius: 999px; font-weight: 800; font-size: 15px; padding: 4px 12px; }
   a.action.ferme { opacity: .5; pointer-events: none; }
   .carte { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 14px; }
   label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
@@ -70,8 +76,13 @@
   </form>
 
   <div id="contenu" hidden>
+    <section class="section" id="secJonc" hidden>
+      <h2>Jonction</h2>
+      <a class="gros fonce" href="jonction.html"><div class="pic" id="icJonc"></div><div class="tx"><b>Fiche de jonction</b><span>Réglage et contrôle des jonctions</span></div><span class="fl" id="flJonc"></span></a>
+    </section>
     <section class="section" id="secInter">
-      <h2>Bons d'intervention</h2>
+      <h2>Intervention</h2>
+      <a class="gros" id="btnInter" href="commandes.html"><div class="pic" id="icInter"></div><div class="tx"><b>Bon d'intervention</b><span>Vierge ou depuis une commande</span></div><span class="pastille" id="pastilleCmd" hidden></span></a>
       <div class="grille" id="indicateurs"></div>
       <div class="grille" id="modules_inter"></div>
     </section>
@@ -110,10 +121,7 @@ const RANG = { technicien: 1, gestionnaire: 2, admin: 3 };
 // Boutons de l'accueil. Pour en ajouter un : copier une ligne.
 // droit : jonction, intervention, nc, achats, gestion, fournisseurs ou admin (réglés pour chaque personne dans la page Utilisateurs)
 const MODULES = [
-  { titre: 'Bon d\'intervention vierge', description: 'Saisie d\'un bon sans commande', fichier: 'intervention.html', droit: 'intervention', icone: 'plus', groupe: 'inter' },
-  { titre: 'Bon d\'intervention de commande', description: 'Choisir une commande en cours', fichier: 'commandes.html', droit: 'intervention', icone: 'list', vedette: true, groupe: 'inter' },
   { titre: 'Interventions finies', description: 'Bons réalisés et PDF des commandes', fichier: 'termines.html', droit: 'gestion', icone: 'check', groupe: 'inter' },
-  { titre: 'Jonction', description: 'Paramètres de jonction', fichier: 'jonction.html', droit: 'jonction', icone: 'sliders', groupe: 'inter' },
   { titre: 'Ajouter une NC', description: 'Non-conformité : commande, fournisseur, fabrication', fichier: 'nc-ajout.html', droit: 'nc', icone: 'alert', groupe: 'nc' },
   { titre: 'Nouvelle commande', description: 'Commande fournisseur : PDF et mail', fichier: 'achat-nouveau.html', droit: 'achats', icone: 'cart', groupe: 'achats' },
   { titre: 'Chercher un fournisseur', description: 'Matières et produits finis, par mot-clé', fichier: 'fournisseurs.html', droit: 'fournisseurs', icone: 'tag', groupe: 'four' }
@@ -231,7 +239,12 @@ function dessiner() {
   document.getElementById('contenu').hidden = !niveau;
   const modulesVisibles = MODULES.filter(m => peut(m.droit));
   const aGroupe = g => modulesVisibles.some(m => m.groupe === g);
-  document.getElementById('secInter').hidden = !aGroupe('inter');
+  document.getElementById('secJonc').hidden = !peut('jonction');
+  document.getElementById('secInter').hidden = !(peut('intervention') || aGroupe('inter'));
+  document.getElementById('btnInter').hidden = !peut('intervention');
+  document.getElementById('icJonc').innerHTML = Shell.svg('sliders', 30);
+  document.getElementById('flJonc').innerHTML = Shell.svg('chevron', 24);
+  document.getElementById('icInter').innerHTML = Shell.svg('wrench', 30);
   document.getElementById('indicateurs').hidden = !peut('intervention');
   document.getElementById('secNc').hidden = !peut('nc');
   document.getElementById('secAch').hidden = !peut('achats');
@@ -319,15 +332,17 @@ async function renvoyerBons() {
   }
   if (envoyes) chargerCommandes();
 }
+function majPastille(n) { const p = document.getElementById('pastilleCmd'); p.textContent = n; p.hidden = false; }
 async function chargerCommandes() {
   const c = carte('kCmd');
   c.querySelector('.lib').textContent = 'Interventions à réaliser';
   let memo = null;
   try { memo = JSON.parse(localStorage.getItem('commandesCache')); } catch (e) {}
-  if (Array.isArray(memo)) c.querySelector('b').textContent = memo.length;   // affichage immédiat, mis à jour ensuite
+  if (Array.isArray(memo)) { c.querySelector('b').textContent = memo.length; majPastille(memo.length); }   // affichage immédiat, mis à jour ensuite
   try {
     const r = await Nova.api('commandes', null, 10000);
     c.querySelector('b').textContent = r.commandes.length;
+    majPastille(r.commandes.length);
   } catch (e) { if (!Array.isArray(memo)) c.querySelector('b').textContent = '–'; }
 }
 

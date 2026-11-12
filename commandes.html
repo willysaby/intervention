@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0e9062">
-<title>Commandes en cours</title>
+<title>Bon d'intervention</title>
 <script src="theme.js"></script>
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="shell.css">
@@ -12,14 +12,24 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="commun.css">
+<style>
+  a.gros { display: flex; align-items: center; gap: 16px; background: var(--vert); color: #fff; border-radius: 22px; padding: 20px; text-decoration: none; box-shadow: 0 6px 18px rgba(14,144,98,.25); margin: 6px 0; }
+  a.gros .pic { flex: none; width: 56px; height: 56px; border-radius: 16px; background: rgba(255,255,255,.18); display: grid; place-items: center; }
+  a.gros .tx b { display: block; font-size: 22px; } a.gros .tx span { display: block; font-size: 14px; opacity: .9; margin-top: 3px; }
+  a.gros .fl { margin-left: auto; opacity: .85; display: flex; }
+  .sep { display: flex; align-items: center; gap: 10px; color: var(--mute); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; margin: 20px 0 12px; }
+  .sep::before, .sep::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+</style>
 </head>
 <body>
 <div class="page" id="page">
   <div class="haut">
     <a href="./">← Accueil</a>
-    <h1>Commandes en cours</h1>
+    <h1>Bon d'intervention</h1>
     <button class="btn" id="btnActualiser" type="button">Actualiser</button>
   </div>
+  <a class="gros" id="btnVierge" href="intervention.html"><div class="pic" id="icVierge"></div><div class="tx"><b>Bon vierge</b><span>Sans commande : je saisis tout</span></div><span class="fl" id="flVierge"></span></a>
+  <div class="sep" id="sepCmd">ou depuis une commande en cours</div>
   <input class="champ" id="recherche" type="search" placeholder="Rechercher (N° de commande, client)">
   <div id="infos"></div>
   <div class="liste" id="liste"></div>
@@ -123,6 +133,10 @@ async function charger() {
 }
 
 if (Nova.exiger('intervention')) {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('icVierge').innerHTML = Shell.svg('plus', 32);
+    document.getElementById('flVierge').innerHTML = Shell.svg('chevron', 24);
+  });
   document.getElementById('btnActualiser').onclick = charger;
   document.getElementById('recherche').addEventListener('input', () => dessiner(false));
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
