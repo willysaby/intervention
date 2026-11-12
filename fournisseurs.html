@@ -366,14 +366,15 @@ function appliquer(r) {
 }
 async function charger() {
   if (!Nova.exiger('fournisseurs')) return;
-  if (!tous.length) { try { const memo = JSON.parse(localStorage.getItem('fournisseursCache')); if (memo) { appliquer(memo); dessiner(); } } catch (e) {} }
+  if (!tous.length) { try { const memo = JSON.parse(localStorage.getItem('fournisseursCache')); if (memo && !Array.isArray(memo)) { appliquer(memo); dessiner(); } } catch (e) {} }
   majAttente();
   try {
     const r = await Nova.api('fourListe', null, 20000);
+    if (!('tagsLibres' in r)) { tous = []; dessiner(); throw new Error('Le script Apps Script n\'est pas à jour : c\'est encore l\'ancienne version qui répond. Colle le nouveau Code.gs, puis Déployer > Gérer les déploiements > modifier > Nouvelle version.'); }
     appliquer(r); memoriser();
     el('erreur').hidden = true;
     dessiner();
-  } catch (e) { if (!tous.length) { el('erreur').textContent = e.message; el('erreur').hidden = false; } else dessiner(); }
+  } catch (e) { if (e.code !== 'reseau' || !tous.length) { el('erreur').textContent = e.message; el('erreur').hidden = false; } if (tous.length) dessiner(); }
 }
 charger();
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
