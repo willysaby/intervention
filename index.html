@@ -36,11 +36,22 @@
   a.action b { display: block; font-size: 16px; overflow-wrap: break-word; }
   a.action span.d { display: block; margin-top: 4px; color: var(--mute); font-size: 15px; }
   a.gros { display: flex; align-items: center; gap: 16px; width: 100%; background: var(--vert); color: #fff; border-radius: 22px; padding: 20px; text-decoration: none; box-shadow: 0 6px 18px rgba(14,144,98,.25); margin-bottom: 12px; }
-  a.gros.fonce { background: #0b5d45; }
   a.gros .pic { flex: none; width: 56px; height: 56px; border-radius: 16px; background: rgba(255,255,255,.18); display: grid; place-items: center; }
   a.gros .tx { min-width: 0; } a.gros .tx b { display: block; font-size: 22px; } a.gros .tx span { display: block; font-size: 14px; opacity: .9; margin-top: 3px; }
+  a.gros.attente { background: var(--warnbg); color: var(--warnink); border: 2px solid #e0b100; box-shadow: none; }
+  a.gros.attente .pic { background: rgba(0,0,0,.08); }
+  a.gros.attente .pastille { background: var(--warnink); color: var(--warnbg); }
+  .panneauAtt { background: var(--warnbg); color: var(--warnink); border: 1px solid #e0b100; border-radius: 18px; padding: 14px 16px; margin: -4px 0 12px; display: grid; gap: 10px; }
+  .panneauAtt .msg { font-weight: 600; font-size: 15px; }
+  .panneauAtt .lienSuite { color: var(--warnink); font-weight: 700; text-align: center; text-decoration: none; padding: 6px; }
   a.gros .fl { margin-left: auto; opacity: .85; display: flex; }
-  a.gros .pastille { margin-left: auto; background: #fff; color: #0b5d45; border-radius: 999px; font-weight: 800; font-size: 15px; padding: 4px 12px; }
+  a.gros .pastille { margin-left: auto; background: #fff; color: var(--vert); border-radius: 999px; font-weight: 800; font-size: 15px; padding: 4px 12px; }
+  #modules_inter, #indicateurs { grid-template-columns: 1fr; }
+  #indicateurs:empty { display: none; }
+  #modules_inter a.action { display: grid; grid-template-columns: auto 1fr; column-gap: 16px; align-items: center; min-height: 0; padding: 16px 18px; }
+  #modules_inter a.action .puce { margin: 0; grid-row: 1 / span 2; }
+  #modules_inter a.action span.d { margin-top: 2px; }
+  #modules_inter a.action b { font-size: 18px; }
   a.action.ferme { opacity: .5; pointer-events: none; }
   .carte { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 14px; }
   label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
@@ -78,11 +89,12 @@
   <div id="contenu" hidden>
     <section class="section" id="secJonc" hidden>
       <h2>Jonction</h2>
-      <a class="gros fonce" href="jonction.html"><div class="pic" id="icJonc"></div><div class="tx"><b>Fiche de jonction</b><span>Réglage et contrôle des jonctions</span></div><span class="fl" id="flJonc"></span></a>
+      <a class="gros" href="jonction.html"><div class="pic" id="icJonc"></div><div class="tx"><b>Fiche de jonction</b><span>Réglage et contrôle des jonctions</span></div><span class="fl" id="flJonc"></span></a>
     </section>
     <section class="section" id="secInter">
       <h2>Intervention</h2>
-      <a class="gros" id="btnInter" href="commandes.html"><div class="pic" id="icInter"></div><div class="tx"><b>Bon d'intervention</b><span>Vierge ou depuis une commande</span></div><span class="pastille" id="pastilleCmd" hidden></span></a>
+      <a class="gros" id="btnInter" href="commandes.html"><div class="pic" id="icInter"></div><div class="tx"><b>Bon d'intervention</b><span id="txtInter">Vierge ou depuis une commande</span></div><span class="pastille" id="pastilleCmd" hidden></span></a>
+      <div id="panneauAtt" class="panneauAtt" hidden></div>
       <div class="grille" id="indicateurs"></div>
       <div class="grille" id="modules_inter"></div>
     </section>
@@ -279,36 +291,44 @@ function carte(id) {
 function lireAttente() {
   try { return JSON.parse(localStorage.getItem('bonsEnAttente')) || []; } catch (e) { return []; }
 }
-function majFile() {
-  const l = Nova.lireFile();
-  const c = carte('kFile');
-  c.style.display = l.length ? '' : 'none';
-  c.querySelector('b').textContent = l.length;
-  c.querySelector('.lib').textContent = l.length > 1 ? 'Envois en attente (NC, achats, fournisseurs)' : 'Envoi en attente (NC, achat, fournisseur)';
-  const aide = c.querySelector('.aide');
-  const err = l.find(x => x.erreur);
-  c.classList.toggle('alerte', l.length > 0);
-  aide.hidden = !l.length;
-  aide.textContent = err ? 'Refusé : ' + err.erreur : 'Appuie pour renvoyer';
-  c.onclick = l.length ? () => { aide.textContent = 'Envoi en cours...'; Nova.viderFile().then(majFile); } : null;
-}
-document.addEventListener('nova:file', majFile);
-let renvoiEnCours = false;
+let envoiEnCours = false, messageAtt = '', panneauOuvert = false;
+function nbAttente() { return lireAttente().length + Nova.lireFile().length; }
 function majAttente(message) {
-  const n = lireAttente().length;
-  const c = carte('kAtt');
-  c.querySelector('b').textContent = n;
-  c.querySelector('.lib').textContent = n > 1 ? 'Bons en attente d\'envoi' : 'Bon en attente d\'envoi';
-  const aide = c.querySelector('.aide');
-  c.classList.toggle('alerte', n > 0);
-  aide.hidden = !(n > 0 || message);
-  aide.textContent = message || (n > 0 ? 'Appuie pour renvoyer' : '');
-  c.onclick = n > 0 ? renvoyerBons : null;
+  if (message !== undefined) messageAtt = message;
+  const n = nbAttente();
+  const btn = document.getElementById('btnInter');
+  const pan = document.getElementById('panneauAtt');
+  btn.classList.toggle('attente', n > 0);
+  document.getElementById('pastilleCmd').style.display = n > 0 ? 'none' : '';
+  document.getElementById('txtInter').textContent = n > 0
+    ? n + (n > 1 ? ' envois en attente' : ' envoi en attente') + ' · touche pour envoyer'
+    : 'Vierge ou depuis une commande';
+  if (!panneauOuvert && !messageAtt) { pan.hidden = true; return; }
+  const err = Nova.lireFile().find(x => x.erreur);
+  pan.hidden = false;
+  pan.innerHTML = '';
+  const t = document.createElement('div');
+  t.className = 'msg';
+  t.textContent = messageAtt || (err ? 'Refusé : ' + err.erreur : n + (n > 1 ? ' envois sont gardés sur l\'appareil (bons, NC, achats, fournisseurs).' : ' envoi est gardé sur l\'appareil (bon, NC, achat ou fournisseur).'));
+  pan.appendChild(t);
+  if (n > 0 && !envoiEnCours) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'principal'; b.textContent = 'Envoyer maintenant';
+    b.onclick = envoyerTout;
+    pan.appendChild(b);
+  }
+  const l = document.createElement('a');
+  l.href = 'commandes.html'; l.className = 'lienSuite'; l.textContent = 'Continuer vers les bons →';
+  pan.appendChild(l);
 }
-async function renvoyerBons() {
-  if (renvoiEnCours) return;
-  if (!navigator.onLine) { majAttente('Hors ligne : les bons restent sur l\'appareil.'); return; }
-  renvoiEnCours = true;
+document.getElementById('btnInter').addEventListener('click', e => {
+  if (nbAttente() > 0 && !panneauOuvert) { e.preventDefault(); panneauOuvert = true; majAttente(); }
+});
+document.addEventListener('nova:file', () => majAttente());
+async function envoyerTout() {
+  if (envoiEnCours) return;
+  if (!navigator.onLine) { majAttente('Hors ligne : les envois restent sur l\'appareil.'); return; }
+  envoiEnCours = true;
   majAttente('Envoi en cours...');
   let envoyes = 0, erreur = '', avert = '';
   for (const bon of lireAttente()) {
@@ -322,28 +342,27 @@ async function renvoyerBons() {
       break;
     }
   }
-  renvoiEnCours = false;
-  const reste = lireAttente().length;
-  if (erreur) {
-    majAttente('Échec : ' + erreur);
-    if (reste) document.getElementById('kAtt').onclick = renvoyerBons;
-  } else {
-    majAttente(envoyes + (envoyes > 1 ? ' bons envoyés' : ' bon envoyé') + (avert ? ' ⚠ ' + avert : ''));
+  if (!erreur && Nova.lireFile().length) {
+    const avant = Nova.lireFile().length;
+    try { await Nova.viderFile(); } catch (e) {}
+    envoyes += Math.max(0, avant - Nova.lireFile().length);
   }
+  envoiEnCours = false;
+  const reste = nbAttente();
+  if (erreur) majAttente('Échec : ' + erreur);
+  else if (reste) majAttente(envoyes + ' envoyé' + (envoyes > 1 ? 's' : '') + ', ' + reste + ' refusé' + (reste > 1 ? 's' : '') + (Nova.lireFile().find(x => x.erreur) ? ' : ' + Nova.lireFile().find(x => x.erreur).erreur : ''));
+  else majAttente(envoyes + (envoyes > 1 ? ' envois effectués' : ' envoi effectué') + (avert ? ' ⚠ ' + avert : ''));
   if (envoyes) chargerCommandes();
 }
 function majPastille(n) { const p = document.getElementById('pastilleCmd'); p.textContent = n; p.hidden = false; }
 async function chargerCommandes() {
-  const c = carte('kCmd');
-  c.querySelector('.lib').textContent = 'Interventions à réaliser';
   let memo = null;
   try { memo = JSON.parse(localStorage.getItem('commandesCache')); } catch (e) {}
-  if (Array.isArray(memo)) { c.querySelector('b').textContent = memo.length; majPastille(memo.length); }   // affichage immédiat, mis à jour ensuite
+  if (Array.isArray(memo)) majPastille(memo.length);   // affichage immédiat, mis à jour ensuite
   try {
     const r = await Nova.api('commandes', null, 10000);
-    c.querySelector('b').textContent = r.commandes.length;
     majPastille(r.commandes.length);
-  } catch (e) { if (!Array.isArray(memo)) c.querySelector('b').textContent = '–'; }
+  } catch (e) {}
 }
 
 /* ---------- Non-conformités (gestionnaire et administrateur) ---------- */
@@ -452,7 +471,6 @@ async function chargerUsers() {
 function chargerIndicateurs() {
   chargerAchats();
   if (peut('intervention')) { chargerCommandes(); majAttente(); }
-  majFile();
   chargerNc();
   chargerUsers();
 }
