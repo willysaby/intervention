@@ -13,35 +13,56 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="commun.css">
 <style>
+  [hidden] { display: none !important; }
   .page { max-width: 1040px; }
   .info { border-radius: 14px; padding: 12px 14px; margin: 0 0 12px; font-size: 14px; background: var(--warnbg); color: var(--warnink); }
-  .liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; align-items: start; }
-  @media (max-width: 520px) { .liste { grid-template-columns: 1fr; } }
-  .user { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
-  .user.alerte { border: 2px solid #e0b100; }
-  .user.inactif { opacity: .7; }
-  .user h3 { margin: 0 0 10px; font-size: 17px; display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--pastille); color: var(--mute); }
-  .badge.orange { background: var(--warnbg); color: var(--warnink); }
-  .badge.off { background: var(--kobg); color: var(--koink); }
-  label.l { display: block; font-weight: 600; font-size: 13px; margin: 10px 0 4px; }
-  .codeLigne { display: flex; gap: 6px; }
-  .codeLigne input { flex: 1; min-width: 0; font-family: ui-monospace, Menlo, Consolas, monospace; }
-  .btnP { padding: 9px 12px; font-size: 13px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 600; cursor: pointer; white-space: nowrap; }
-  .droits { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; font-weight: 600; cursor: pointer; user-select: none; }
-  .chip input { display: none; }
-  .chip.on { background: var(--accentbg); color: var(--lien); border-color: var(--lien); }
-  .chip.on::before { content: '✓'; }
-  .app { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--line2); border-radius: 12px; margin-top: 6px; font-size: 13px; }
+  .barre { display: flex; gap: 8px; align-items: center; margin: 4px 0 12px; flex-wrap: wrap; }
+  .barre input { flex: 1; min-width: 180px; padding: 12px 14px; font-size: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); }
+  .liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .ligne { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; cursor: pointer; text-align: left; font-family: inherit; color: var(--ink); width: 100%; }
+  .ligne.alerte { border: 2px solid #e0b100; }
+  .ligne.inactif { opacity: .6; }
+  .ini { flex: none; width: 42px; height: 42px; border-radius: 50%; background: var(--accentbg); color: var(--lien); display: grid; place-items: center; font-weight: 800; font-size: 16px; }
+  .ligne .qui { flex: 1; min-width: 0; }
+  .ligne .qui b { display: block; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mini { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .mini span { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--pastille); color: var(--mute); }
+  .mini span.adm { background: var(--accentbg); color: var(--lien); }
+  .mini span.off { background: var(--kobg); color: var(--koink); }
+  .mini span.nv { background: var(--warnbg); color: var(--warnink); }
+  .chev { color: var(--mute); font-size: 22px; }
+  /* éditeur plein écran */
+  #editeur { position: fixed; inset: 0; background: var(--bg, #fff); z-index: 50; overflow: auto; padding: 12px 16px 100px; }
+  #editeur .cadre { max-width: 640px; margin: auto; }
+  #editeur h2 { margin: 6px 0 4px; font-size: 21px; }
+  .sec { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-top: 14px; }
+  .sec h4 { margin: 0 0 10px; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--mute); }
+  .sec label.l { display: block; font-weight: 700; font-size: 13px; margin: 0 0 4px; }
+  .codeBox { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 20px; letter-spacing: .04em; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg, #fff); overflow-wrap: anywhere; text-align: center; min-height: 52px; }
+  .trois { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .btnP { padding: 12px 8px; font-size: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 700; cursor: pointer; font-family: inherit; }
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .presets .btnP { flex: 1; min-width: 0; font-size: 13px; padding: 10px 4px; }
+  .interr { display: flex; gap: 12px; align-items: center; padding: 12px 2px; border-top: 1px solid var(--line); cursor: pointer; }
+  .interr:first-of-type { border-top: 0; }
+  .interr .txt { flex: 1; }
+  .interr .txt b { display: block; font-size: 15px; }
+  .interr .txt small { color: var(--mute); font-size: 12px; }
+  .interr input { display: none; }
+  .sw { flex: none; width: 50px; height: 30px; border-radius: 999px; background: var(--line); position: relative; transition: background .15s; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+  .interr input:checked + .sw { background: #0e9062; }
+  .interr input:checked + .sw::after { left: 23px; }
+  .interr.fige { opacity: .55; pointer-events: none; }
+  .app { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; margin-top: 8px; font-size: 14px; }
   .app.nouveau { background: var(--warnbg); border-color: transparent; }
-  .app .qui { flex: 1; min-width: 160px; }
-  .pied { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
-  .pied .btn { flex: 1; }
-  .msg { font-weight: 600; font-size: 13px; min-height: 1.2em; margin-top: 8px; }
-  .msg.ko { color: var(--koink); } .msg.ok { color: var(--okink); }
-  .nouveauCode { background: var(--okbg); color: var(--okink); border-radius: 12px; padding: 12px; margin-top: 10px; font-weight: 700; overflow-wrap: anywhere; }
-  .nouveauCode code { font-size: 16px; }
+  .app .qui2 { flex: 1; min-width: 150px; }
+  .bas { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 8px; justify-content: center; z-index: 60; }
+  .bas .btn { min-width: 140px; }
+  #msgEd { font-weight: 600; text-align: center; margin: 14px 0; min-height: 1.2em; }
+  #msgEd.ko { color: var(--koink); } #msgEd.ok { color: var(--okink); }
+  .nouveauCode { background: var(--okbg); color: var(--okink); border-radius: 12px; padding: 14px; margin-top: 14px; font-weight: 700; text-align: center; }
+  .nouveauCode code { display: block; font-size: 22px; margin: 6px 0 10px; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -49,115 +70,182 @@
   <div class="haut"><a href="./">← Accueil</a><h1>Utilisateurs et droits</h1></div>
   <div id="infos"></div>
   <div id="erreur" class="erreurPage" hidden></div>
-  <div class="user" id="creation" style="margin-bottom:14px" hidden>
-    <h3>Nouvel utilisateur</h3>
-    <label class="l" for="nNom">Nom et prénom</label>
-    <input class="champ" id="nNom" placeholder="Kevin Boucher">
-    <label class="l">Droits</label>
-    <div class="droits" id="nDroits"></div>
-    <div class="pied"><button class="btn vert" type="button" id="btnCreer">Créer le compte</button><button class="btn" type="button" id="btnAnnuler">Annuler</button></div>
-    <div class="msg" id="nMsg"></div>
+  <div class="barre">
+    <input id="q" type="search" placeholder="Rechercher une personne" autocomplete="off">
+    <button class="btn vert" type="button" id="btnNouveau">+ Nouvel utilisateur</button>
   </div>
-  <button class="btn vert" type="button" id="btnNouveau" style="margin-bottom:14px">+ Nouvel utilisateur</button>
   <div class="liste" id="liste"></div>
 </div>
+
+<div id="editeur" hidden>
+  <div class="cadre">
+    <h2 id="edTitre"></h2>
+    <div class="sec">
+      <h4>Identité</h4>
+      <label class="l" for="eNom">Nom et prénom</label>
+      <input class="champ" id="eNom" maxlength="60" autocomplete="off">
+    </div>
+    <div class="sec" id="secCode">
+      <h4>Code de connexion</h4>
+      <div class="codeBox" id="codeBox">••••••••</div>
+      <div class="trois">
+        <button type="button" class="btnP" id="bVoir">Afficher</button>
+        <button type="button" class="btnP" id="bCopier">Copier</button>
+        <button type="button" class="btnP" id="bNeuf">Nouveau code</button>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>Droits</h4>
+      <div class="presets" id="presets"></div>
+      <div id="interrupteurs"></div>
+    </div>
+    <div class="sec" id="secActif">
+      <label class="interr" style="padding:0;border:0"><div class="txt"><b>Compte actif</b><small>Désactivé : la personne ne peut plus se connecter</small></div><input type="checkbox" id="eActif"><span class="sw"></span></label>
+    </div>
+    <div class="sec" id="secApps"><h4>Appareils</h4><div id="apps"></div></div>
+    <div id="msgEd"></div>
+    <div id="codeCree"></div>
+  </div>
+  <div class="bas">
+    <button type="button" class="btn" id="edFermer">Fermer</button>
+    <button type="button" class="btn vert" id="edSauver" disabled>Enregistrer</button>
+  </div>
+</div>
+
 <script src="config.js"></script>
 <script src="commun.js"></script>
 <script src="shell.js"></script>
 <script>
-const LIB = { jonction: 'Jonction', intervention: 'Intervention', nc: 'Non-conformités', achats: 'Achats', gestion: 'Gestion', fournisseurs: 'Fournisseurs', admin: 'Administrateur' };
-let DROITS = [], donnees = null;
+const LIB = {
+  jonction: ['Jonction', 'Réglages et fiches de jonction'],
+  intervention: ['Intervention', 'Bons d\'intervention et commandes en cours'],
+  nc: ['Non-conformités', 'Saisie et liste des NC'],
+  achats: ['Achats', 'Commandes fournisseurs (consommables)'],
+  gestion: ['Gestion', 'Interventions terminées et suivi'],
+  fournisseurs: ['Fournisseurs', 'Annuaire des fournisseurs'],
+  admin: ['Administrateur', 'Tous les droits + gestion des utilisateurs']
+};
+const COURT = { jonction: 'Jonction', intervention: 'Intervention', nc: 'NC', achats: 'Achats', gestion: 'Gestion', fournisseurs: 'Fournisseurs', admin: 'Administrateur' };
+const PRESETS = [['Technicien', ['jonction', 'intervention']], ['Gestionnaire', ['jonction', 'intervention', 'nc', 'achats', 'gestion', 'fournisseurs']], ['Administrateur', ['admin']]];
+let DROITS = [], donnees = null, courant = null, droitsEd = [], modifie = false, codeVisible = false;
 const el = id => document.getElementById(id);
+const norm = s => Nova.norm(s);
+function h(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
 function jolieDate(s) { const m = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}:\d{2}))?/.exec(s || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] + (m[4] ? ' ' + m[4] : '') : (s || ''); }
-
-function puces(conteneur, actifs) {
-  conteneur.innerHTML = '';
-  DROITS.forEach(d => {
-    const l = document.createElement('label'); l.className = 'chip' + (actifs.indexOf(d) >= 0 ? ' on' : '');
-    const c = document.createElement('input'); c.type = 'checkbox'; c.value = d; c.checked = actifs.indexOf(d) >= 0;
-    c.onchange = () => { l.classList.toggle('on', c.checked); conteneur.dispatchEvent(new Event('modif', { bubbles: true })); };
-    l.appendChild(c); l.appendChild(document.createTextNode(' ' + LIB[d])); conteneur.appendChild(l);
-  });
-}
-function lireDroits(conteneur) { const o = {}; conteneur.querySelectorAll('input').forEach(c => { o[c.value] = c.checked; }); return o; }
-
-function carte(u) {
-  const nouveaux = u.appareils.filter(a => a.statut === 'Nouveau');
-  const c = document.createElement('div');
-  c.className = 'user' + (nouveaux.length ? ' alerte' : '') + (u.actif ? '' : ' inactif');
-  c.innerHTML = '<h3><span class="nom"></span><span class="badges"></span></h3>' +
-    '<label class="l">Nom</label><input class="champ f-nom">' +
-    '<label class="l">Code de connexion</label><div class="codeLigne"><input class="champ f-code" type="password" autocomplete="off">' +
-    '<button type="button" class="btnP b-voir">Afficher</button><button type="button" class="btnP b-copier">Copier</button><button type="button" class="btnP b-neuf">Nouveau</button></div>' +
-    '<label class="l">Droits</label><div class="droits"></div>' +
-    '<label class="chip f-actif-l" style="margin-top:10px"><input type="checkbox" class="f-actif"> Compte actif</label>' +
-    '<label class="l">Appareils</label><div class="apps"></div>' +
-    '<div class="pied"><button type="button" class="btn vert b-sauver" disabled>Enregistrer</button></div><div class="msg"></div>';
-  const nom = c.querySelector('.f-nom'), code = c.querySelector('.f-code'), actif = c.querySelector('.f-actif'), droits = c.querySelector('.droits'), msg = c.querySelector('.msg'), sauver = c.querySelector('.b-sauver');
-  c.querySelector('.nom').textContent = u.nom;
-  const badges = c.querySelector('.badges');
-  const b = (t, k) => { const s = document.createElement('span'); s.className = 'badge ' + (k || ''); s.textContent = t; badges.appendChild(s); };
-  if (!u.actif) b('Désactivé', 'off'); if (nouveaux.length) b('⚠ Nouvel appareil', 'orange'); if (u.droits.indexOf('admin') >= 0) b('Administrateur');
-  nom.value = u.nom; code.value = u.code; actif.checked = u.actif;
-  c.querySelector('.f-actif-l').classList.toggle('on', u.actif);
-  puces(droits, u.droits);
-  const modif = () => { sauver.disabled = false; msg.textContent = ''; };
-  [nom, code].forEach(i => i.addEventListener('input', modif));
-  droits.addEventListener('modif', modif);
-  actif.onchange = () => { c.querySelector('.f-actif-l').classList.toggle('on', actif.checked); modif(); };
-  c.querySelector('.b-voir').onclick = e => { const voir = code.type === 'password'; code.type = voir ? 'text' : 'password'; e.target.textContent = voir ? 'Masquer' : 'Afficher'; };
-  c.querySelector('.b-copier').onclick = async e => { try { await navigator.clipboard.writeText(code.value); e.target.textContent = 'Copié ✓'; setTimeout(() => e.target.textContent = 'Copier', 1500); } catch (x) { code.type = 'text'; code.select(); } };
-  c.querySelector('.b-neuf').onclick = async () => {
-    if (!confirm('Générer un nouveau code pour ' + u.nom + ' ? L\'ancien code ne marchera plus.')) return;
-    try { const r = await Nova.api('usersNouveauCode', { ligne: u.ligne, ancienNom: u.nom }, 20000); code.value = r.code; code.type = 'text'; c.querySelector('.b-voir').textContent = 'Masquer'; u.code = r.code; msg.className = 'msg ok'; msg.textContent = '✓ Nouveau code enregistré : ' + r.code; } catch (e) { msg.className = 'msg ko'; msg.textContent = e.message; }
-  };
-  sauver.onclick = async () => {
-    sauver.disabled = true; msg.className = 'msg'; msg.textContent = 'Enregistrement...';
-    try {
-      await Nova.api('usersSauver', { utilisateur: { ligne: u.ligne, ancienNom: u.nom, nom: nom.value, code: code.value, actif: actif.checked, droits: lireDroits(droits) } }, 20000);
-      await charger();
-    } catch (e) { sauver.disabled = false; msg.className = 'msg ko'; msg.textContent = e.message; }
-  };
-  const apps = c.querySelector('.apps');
-  if (!u.appareils.length) { const v = document.createElement('div'); v.className = 'msg'; v.style.color = 'var(--mute)'; v.textContent = 'Aucun appareil enregistré pour l\'instant.'; apps.appendChild(v); }
-  u.appareils.forEach(a => {
-    const d = document.createElement('div'); d.className = 'app' + (a.statut === 'Nouveau' ? ' nouveau' : '');
-    const q = document.createElement('span'); q.className = 'qui'; q.textContent = a.libelle + ' · ' + jolieDate(a.date) + (a.statut === 'Nouveau' ? ' · NOUVEAU' : ''); d.appendChild(q);
-    const act = (t, action) => { const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'btnP'; bt.textContent = t;
-      bt.onclick = async () => { if (action === 'supprimer' && !confirm('Supprimer cet appareil de la liste ?')) return; bt.disabled = true;
-        try { await Nova.api('usersAppareil', { ligne: a.ligne, nom: a.nom, id: a.id, action: action }, 20000); await charger(); } catch (e) { bt.disabled = false; msg.className = 'msg ko'; msg.textContent = e.message; } };
-      d.appendChild(bt); };
-    if (a.statut === 'Nouveau') act('C\'est bon', 'valider');
-    act('Supprimer', 'supprimer');
-    apps.appendChild(d);
-  });
-  return c;
-}
+function initiales(n) { return String(n).split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '?'; }
 
 function dessiner() {
   const infos = el('infos'); infos.innerHTML = '';
-  if (donnees.ancien) { const d = document.createElement('div'); d.className = 'info'; d.textContent = 'Les anciens codes communs (technicien, gestionnaire, administrateur) fonctionnent encore. Quand tout le monde a son code personnel, passe LOGIN_ANCIEN à false dans Code.gs pour les désactiver.'; infos.appendChild(d); }
-  if (!donnees.jonctionConfiguree) { const d = document.createElement('div'); d.className = 'info'; d.textContent = 'La page Jonction n\'est pas encore reliée aux comptes personnels : ajoute JONCTION_CODE_ACCES et JONCTION_CODE_ADMIN dans les propriétés du script (voir la procédure).'; infos.appendChild(d); }
+  if (donnees.ancien) infos.appendChild(h('div', 'info', 'Les anciens codes communs (technicien, gestionnaire, administrateur) fonctionnent encore. Quand tout le monde a son code personnel, passe LOGIN_ANCIEN à false dans Code.gs et redéploie.'));
+  if (!donnees.jonctionConfiguree) infos.appendChild(h('div', 'info', 'La page Jonction n\'est pas encore reliée aux comptes personnels : ajoute JONCTION_CODE_ACCES et JONCTION_CODE_ADMIN dans les propriétés du script.'));
+  const q = norm(el('q').value.trim());
   const zone = el('liste'); zone.innerHTML = '';
-  donnees.users.slice().sort((a, b) => (b.appareils.some(x => x.statut === 'Nouveau') - a.appareils.some(x => x.statut === 'Nouveau')) || (b.actif - a.actif) || a.nom.localeCompare(b.nom, 'fr')).forEach(u => zone.appendChild(carte(u)));
+  donnees.users.filter(u => !q || norm(u.nom).indexOf(q) >= 0)
+    .sort((a, b) => (b.appareils.some(x => x.statut === 'Nouveau') - a.appareils.some(x => x.statut === 'Nouveau')) || (b.actif - a.actif) || a.nom.localeCompare(b.nom, 'fr'))
+    .forEach(u => {
+      const nv = u.appareils.some(a => a.statut === 'Nouveau');
+      const b = h('button', 'ligne' + (nv ? ' alerte' : '') + (u.actif ? '' : ' inactif')); b.type = 'button';
+      b.appendChild(h('div', 'ini', initiales(u.nom)));
+      const qui = h('div', 'qui'); qui.appendChild(h('b', null, u.nom));
+      const mini = h('div', 'mini');
+      if (!u.actif) mini.appendChild(h('span', 'off', 'Désactivé'));
+      if (nv) mini.appendChild(h('span', 'nv', '⚠ Nouvel appareil'));
+      if (u.droits.indexOf('admin') >= 0) mini.appendChild(h('span', 'adm', 'Administrateur'));
+      else u.droits.forEach(d => mini.appendChild(h('span', null, COURT[d] || d)));
+      qui.appendChild(mini); b.appendChild(qui); b.appendChild(h('span', 'chev', '›'));
+      b.onclick = () => ouvrir(u);
+      zone.appendChild(b);
+    });
+  if (!zone.children.length) zone.appendChild(h('div', 'info', 'Aucun utilisateur.'));
 }
+
+// ---- éditeur ----
+function majCode() {
+  el('codeBox').textContent = codeVisible && courant ? courant.code : '••••••••';
+  el('bVoir').textContent = codeVisible ? 'Masquer' : 'Afficher';
+}
+function interrupteurs() {
+  const z = el('interrupteurs'); z.innerHTML = '';
+  const admin = droitsEd.indexOf('admin') >= 0;
+  DROITS.forEach(d => {
+    const l = h('label', 'interr' + (admin && d !== 'admin' ? ' fige' : ''));
+    const t = h('div', 'txt'); t.appendChild(h('b', null, LIB[d][0])); t.appendChild(h('small', null, LIB[d][1])); l.appendChild(t);
+    const c = h('input'); c.type = 'checkbox'; c.checked = admin ? true : droitsEd.indexOf(d) >= 0;
+    c.onchange = () => { droitsEd = c.checked ? droitsEd.concat([d]) : droitsEd.filter(x => x !== d); modifie = true; el('edSauver').disabled = false; interrupteurs(); };
+    l.appendChild(c); l.appendChild(h('span', 'sw')); z.appendChild(l);
+  });
+}
+function presets() {
+  const z = el('presets'); z.innerHTML = '';
+  PRESETS.forEach(([n, d]) => { const b = h('button', 'btnP', n); b.type = 'button'; b.onclick = () => { droitsEd = d.filter(x => DROITS.indexOf(x) >= 0); modifie = true; el('edSauver').disabled = false; interrupteurs(); }; z.appendChild(b); });
+}
+function ouvrir(u) {
+  courant = u || null; modifie = false; codeVisible = false;
+  droitsEd = u ? u.droits.slice() : ['jonction', 'intervention'];
+  el('edTitre').textContent = u ? u.nom : 'Nouvel utilisateur';
+  el('eNom').value = u ? u.nom : '';
+  el('eActif').checked = u ? u.actif : true;
+  el('secCode').hidden = el('secActif').hidden = el('secApps').hidden = !u;
+  el('edSauver').textContent = u ? 'Enregistrer' : 'Créer le compte';
+  el('edSauver').disabled = !!u;
+  el('msgEd').textContent = ''; el('msgEd').className = ''; el('codeCree').innerHTML = '';
+  majCode(); presets(); interrupteurs(); appareils();
+  el('editeur').hidden = false; el('page').hidden = true; window.scrollTo(0, 0); el('editeur').scrollTop = 0;
+}
+function fermer() { el('editeur').hidden = true; el('page').hidden = false; courant = null; }
+function appareils() {
+  const z = el('apps'); z.innerHTML = '';
+  if (!courant) return;
+  if (!courant.appareils.length) { z.appendChild(h('div', null, 'Aucun appareil enregistré pour l\'instant.')).style.color = 'var(--mute)'; return; }
+  courant.appareils.forEach(a => {
+    const d = h('div', 'app' + (a.statut === 'Nouveau' ? ' nouveau' : ''));
+    d.appendChild(h('span', 'qui2', a.libelle + ' · ' + jolieDate(a.date) + (a.statut === 'Nouveau' ? ' · NOUVEAU' : '')));
+    const act = (t, action) => { const bt = h('button', 'btnP', t); bt.type = 'button'; bt.style.padding = '8px 12px';
+      bt.onclick = async () => { if (action === 'supprimer' && !confirm('Supprimer cet appareil de la liste ?')) return; bt.disabled = true;
+        try { await Nova.api('usersAppareil', { ligne: a.ligne, nom: a.nom, id: a.id, action: action }, 20000); const nom = courant.nom; await charger(); const u = donnees.users.find(x => x.nom === nom); if (u) ouvrir(u); }
+        catch (e) { bt.disabled = false; el('msgEd').className = 'ko'; el('msgEd').textContent = e.message; } };
+      d.appendChild(bt); };
+    if (a.statut === 'Nouveau') act('C\'est bon', 'valider');
+    act('Supprimer', 'supprimer');
+    z.appendChild(d);
+  });
+}
+el('eNom').addEventListener('input', () => { modifie = true; el('edSauver').disabled = false; });
+el('eActif').addEventListener('change', () => { modifie = true; el('edSauver').disabled = false; });
+el('bVoir').onclick = () => { codeVisible = !codeVisible; majCode(); };
+el('bCopier').onclick = async () => { try { await navigator.clipboard.writeText(courant.code); el('bCopier').textContent = 'Copié ✓'; setTimeout(() => el('bCopier').textContent = 'Copier', 1500); } catch (x) { codeVisible = true; majCode(); } };
+el('bNeuf').onclick = async () => {
+  if (!confirm('Générer un nouveau code pour ' + courant.nom + ' ? L\'ancien code ne marchera plus.')) return;
+  try { const r = await Nova.api('usersNouveauCode', { ligne: courant.ligne, ancienNom: courant.nom }, 20000); courant.code = r.code; codeVisible = true; majCode(); el('msgEd').className = 'ok'; el('msgEd').textContent = '✓ Nouveau code généré : transmets-le à la personne.'; }
+  catch (e) { el('msgEd').className = 'ko'; el('msgEd').textContent = e.message; }
+};
+el('edFermer').onclick = () => { if (modifie && !confirm('Quitter sans enregistrer les modifications ?')) return; fermer(); };
+el('btnNouveau').onclick = () => ouvrir(null);
+function droitsObj() { const o = {}; DROITS.forEach(d => { o[d] = droitsEd.indexOf(d) >= 0; }); return o; }
+el('edSauver').onclick = async () => {
+  const msg = el('msgEd'); msg.className = ''; msg.textContent = 'Enregistrement...'; el('edSauver').disabled = true;
+  try {
+    if (courant) {
+      await Nova.api('usersSauver', { utilisateur: { ligne: courant.ligne, ancienNom: courant.nom, nom: el('eNom').value, code: courant.code, actif: el('eActif').checked, droits: droitsObj() } }, 20000);
+      modifie = false; await charger(); fermer();
+    } else {
+      const r = await Nova.api('usersCreer', { utilisateur: { nom: el('eNom').value, droits: droitsObj() } }, 20000);
+      modifie = false; msg.textContent = '';
+      el('codeCree').innerHTML = ''; const d = h('div', 'nouveauCode', 'Compte créé. Code à transmettre à la personne :'); d.appendChild(h('code', null, r.code));
+      const b = h('button', 'btnP', 'Copier le code'); b.type = 'button'; b.onclick = async () => { try { await navigator.clipboard.writeText(r.code); b.textContent = 'Copié ✓'; } catch (x) {} }; d.appendChild(b);
+      el('codeCree').appendChild(d); el('edSauver').hidden = true; el('edFermer').textContent = 'Terminer'; await charger();
+    }
+  } catch (e) { msg.className = 'ko'; msg.textContent = e.message; el('edSauver').disabled = false; }
+};
+el('q').addEventListener('input', () => donnees && dessiner());
 
 async function charger() {
   try { donnees = await Nova.api('usersListe', null, 20000); } catch (e) { el('erreur').textContent = e.message; el('erreur').hidden = false; return; }
   DROITS = donnees.droits; el('erreur').hidden = true; dessiner();
-  puces(el('nDroits'), ['jonction', 'intervention']);
 }
-
-el('btnNouveau').onclick = () => { el('creation').hidden = false; el('btnNouveau').hidden = true; el('nNom').focus(); };
-el('btnAnnuler').onclick = () => { el('creation').hidden = true; el('btnNouveau').hidden = false; el('nMsg').textContent = ''; };
-el('btnCreer').onclick = async () => {
-  const m = el('nMsg'); m.className = 'msg'; m.textContent = 'Création...';
-  try {
-    const r = await Nova.api('usersCreer', { utilisateur: { nom: el('nNom').value, droits: lireDroits(el('nDroits')) } }, 20000);
-    m.className = 'msg ok'; m.innerHTML = ''; const d = document.createElement('div'); d.className = 'nouveauCode'; d.innerHTML = 'Compte créé. Code à lui transmettre : <code></code>'; d.querySelector('code').textContent = r.code; m.appendChild(d);
-    el('nNom').value = ''; await charger();
-  } catch (e) { m.className = 'msg ko'; m.textContent = e.message; }
-};
+// bouton « Terminer » après création : on remet l'éditeur à l'état normal
+const ferme0 = el('edFermer').onclick;
+el('edFermer').onclick = () => { if (el('edSauver').hidden) { el('edSauver').hidden = false; el('edFermer').textContent = 'Fermer'; modifie = false; fermer(); return; } ferme0(); };
 if (Nova.exiger('admin')) charger();
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 </script>

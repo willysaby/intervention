@@ -69,7 +69,7 @@
   .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
   .chips span.c { background: var(--accentbg); color: var(--lien); border-radius: 999px; padding: 4px 6px 4px 11px; font-size: 13px; font-weight: 700; display: inline-flex; gap: 6px; align-items: center; }
   .chips span.c b { cursor: pointer; font-size: 16px; line-height: 1; }
-  .chips input { border: 0; outline: 0; background: none; flex: 1; min-width: 120px; font-size: 16px; color: var(--ink); font-family: inherit; }
+  .chips input { border: 0; outline: 0; background: none; flex: 1; min-width: 160px; font-size: 16px; color: var(--ink); font-family: inherit; }
   .multi .lig { display: flex; gap: 6px; margin-bottom: 6px; }
   .multi .lig input { flex: 1; }
   .btnPetit { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 700; cursor: pointer; font-family: inherit; }
@@ -257,7 +257,7 @@ function dessinerTableau(res) {
 function chips(zoneId, valeurs, dlId) {
   const z = el(zoneId); z.innerHTML = '';
   const liste = valeurs.slice();
-  const inp = h('input'); inp.setAttribute('list', dlId); inp.placeholder = 'Ajouter...';
+  const inp = h('input'); inp.setAttribute('list', dlId); inp.placeholder = 'Taper un nom puis Entrée ou « + Ajouter »';
   function redessiner() {
     z.querySelectorAll('.c').forEach(c => c.remove());
     liste.forEach((v, i) => { const s = h('span', 'c', v); const x = h('b', null, '×'); x.onclick = () => { liste.splice(i, 1); redessiner(); }; s.appendChild(x); z.insertBefore(s, inp); });
@@ -265,7 +265,9 @@ function chips(zoneId, valeurs, dlId) {
   function ajouter() { inp.value.split(/[,;]+/).map(x => x.trim()).filter(Boolean).forEach(v => { if (!liste.some(x => norm(x) === norm(v))) liste.push(v); }); inp.value = ''; redessiner(); }
   inp.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); ajouter(); } else if (e.key === 'Backspace' && !inp.value && liste.length) { liste.pop(); redessiner(); } });
   inp.addEventListener('change', ajouter); inp.addEventListener('blur', ajouter);
-  z.appendChild(inp); redessiner();
+  z.appendChild(inp);
+  const bt = h('button', 'btnPetit', '+ Ajouter'); bt.type = 'button'; bt.onclick = () => { ajouter(); inp.focus(); }; z.appendChild(bt);
+  redessiner();
   z.valeurs = () => { ajouter(); return liste.slice(); };
 }
 function multi(zoneId, valeurs, type, place) {
@@ -374,7 +376,10 @@ async function charger() {
     appliquer(r); memoriser();
     el('erreur').hidden = true;
     dessiner();
-  } catch (e) { if (e.code !== 'reseau' || !tous.length) { el('erreur').textContent = e.message; el('erreur').hidden = false; } if (tous.length) dessiner(); }
+  } catch (e) {
+    el('erreur').textContent = (e.code === 'reseau' && tous.length ? '⚠ Données enregistrées sur l\'appareil (le serveur n\'a pas répondu) : ' : '') + e.message; el('erreur').hidden = false;
+    if (tous.length) dessiner();
+  }
 }
 charger();
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
