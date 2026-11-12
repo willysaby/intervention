@@ -200,7 +200,7 @@
         envoyes++;
       } catch (e) {
         if (e.code === 'reseau' || e.code === 'session') break;
-        if (it.action === 'fourAjouter' && /existe déjà/.test(e.message)) { ecrireFile(lireFile().filter(function (x) { return x.id !== it.id; })); envoyes++; continue; }
+        if (/^four(Ajouter|Sauver)$/.test(it.action) && /existe déjà/.test(e.message)) { ecrireFile(lireFile().filter(function (x) { return x.id !== it.id; })); envoyes++; continue; }
         ecrireFile(lireFile().map(function (x) { return x.id === it.id ? Object.assign({}, x, { erreur: e.message }) : x; }));
         erreurs++;
       }

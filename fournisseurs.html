@@ -13,80 +13,135 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="commun.css">
 <style>
-  .page { max-width: 1040px; }
+  [hidden] { display: none !important; }
+  .page { max-width: 1180px; }
+  .barre { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 12px; }
+  .barre .sp { flex: 1; }
+  .bascule { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .bascule button { border: 0; background: var(--card); color: var(--ink); padding: 9px 14px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; }
+  .bascule button.on { background: var(--accentbg); color: var(--lien); }
   .recherche { width: 100%; padding: 14px; font-size: 17px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); }
   .pills { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
-  .pill { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; }
+  .pill { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; font-family: inherit; }
   .pill.on { background: var(--accentbg); color: var(--lien); border-color: var(--lien); }
   .nuage { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin: 14px 0 6px; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+  .nuage.ferme { max-height: 96px; overflow: hidden; }
   .nuage button { border: 0; background: none; color: var(--lien); cursor: pointer; padding: 2px 0; font-family: inherit; font-weight: 600; }
   .nuage button.on { background: var(--accentbg); border-radius: 8px; padding: 2px 8px; }
-  .nuage .t { color: var(--mute); font-size: 13px; width: 100%; }
+  .nuage sup { color: var(--mute); font-weight: 600; font-size: 11px; }
+  .nuage .t { color: var(--mute); font-size: 13px; width: 100%; display: flex; gap: 12px; flex-wrap: wrap; }
+  .nuage .t button { font-size: 13px; }
+  .plus { display: none; width: 100%; border: 0; background: none; color: var(--lien); font-weight: 700; padding: 6px; font-family: inherit; cursor: pointer; }
+  @media (max-width: 700px) { .plus { display: block; } }
+  @media (min-width: 701px) { .nuage.ferme { max-height: none; overflow: visible; } }
   .nb { color: var(--mute); font-size: 14px; margin: 10px 0; }
-  .liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; }
+  .liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
   @media (max-width: 520px) { .liste { grid-template-columns: 1fr; } }
   .four { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
-  .four h3 { margin: 0 0 6px; font-size: 17px; display: flex; gap: 8px; justify-content: space-between; align-items: baseline; }
-  .four h3 small { font-size: 12px; font-weight: 700; color: var(--okink); background: var(--okbg); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+  .four h3 { margin: 0 0 8px; font-size: 17px; display: flex; gap: 8px; justify-content: space-between; align-items: baseline; }
   .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-  .tag { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--pastille); color: var(--mute); }
-  .tag.metier { background: var(--accentbg); color: var(--lien); }
+  .tag { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--accentbg); color: var(--lien); }
+  .tag.fam { background: var(--pastille); color: var(--mute); }
   .tag.hit { background: var(--okbg); color: var(--okink); }
-  .contact { font-size: 14px; color: var(--mute); margin-top: 10px; line-height: 1.6; overflow-wrap: anywhere; }
-  .contact a { color: var(--lien); font-weight: 600; text-decoration: none; }
-  .notes { font-size: 13px; color: var(--mute); margin-top: 6px; font-style: italic; }
-  details.ajout { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; margin: 0 0 14px; }
-  details.ajout summary { font-weight: 700; cursor: pointer; color: var(--lien); }
-  .grille2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
-  .grille2 label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 4px; }
-  #msgAjout { font-weight: 600; margin-top: 10px; min-height: 1.2em; }
-  #msgAjout.ko { color: var(--koink); } #msgAjout.ok { color: var(--okink); }
+  .ct { font-size: 14px; color: var(--mute); margin-top: 8px; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .actions a { text-decoration: none; border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; font-size: 13px; color: var(--ink); background: var(--card); overflow-wrap: anywhere; }
+  .actions a.tel { background: var(--okbg); color: var(--okink); border-color: transparent; }
+  .actions a.mail { background: var(--accentbg); color: var(--lien); border-color: transparent; }
+  .notes { font-size: 13px; color: var(--mute); margin-top: 8px; font-style: italic; }
+  .vide { color: var(--warnink); font-size: 12px; margin-top: 6px; }
+  .btnMod { border: 1px solid var(--line); background: var(--card); color: var(--lien); border-radius: 10px; padding: 5px 10px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .tableau { overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--card); max-height: 75vh; }
+  table.t { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table.t th, table.t td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  table.t th { position: sticky; top: 0; background: var(--card); color: var(--ink); cursor: pointer; white-space: nowrap; z-index: 2; font-size: 13px; }
+  table.t td:first-child, table.t th:first-child { position: sticky; left: 0; background: var(--card); z-index: 1; font-weight: 700; }
+  table.t th:first-child { z-index: 3; }
+  table.t td a { color: var(--lien); text-decoration: none; display: block; white-space: nowrap; }
+  table.t td { color: var(--ink); }
+  table.t td:last-child, table.t th:last-child { position: sticky; right: 0; background: var(--card); }
+  table.t tr:nth-child(even) td { background: color-mix(in srgb, var(--pastille) 35%, var(--card)); }
+  /* éditeur */
+  #editeur { position: fixed; inset: 0; background: var(--bg, #fff); z-index: 50; overflow: auto; padding: 14px 16px 90px; }
+  #editeur .cadre { max-width: 720px; margin: auto; }
+  #editeur h2 { margin: 6px 0 14px; font-size: 20px; }
+  #editeur label { display: block; font-weight: 700; font-size: 13px; margin: 14px 0 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+  .chips span.c { background: var(--accentbg); color: var(--lien); border-radius: 999px; padding: 4px 6px 4px 11px; font-size: 13px; font-weight: 700; display: inline-flex; gap: 6px; align-items: center; }
+  .chips span.c b { cursor: pointer; font-size: 16px; line-height: 1; }
+  .chips input { border: 0; outline: 0; background: none; flex: 1; min-width: 120px; font-size: 16px; color: var(--ink); font-family: inherit; }
+  .multi .lig { display: flex; gap: 6px; margin-bottom: 6px; }
+  .multi .lig input { flex: 1; }
+  .btnPetit { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 700; cursor: pointer; font-family: inherit; }
+  .bas { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 8px; justify-content: center; z-index: 60; }
+  .bas .btn { min-width: 130px; }
+  #msgEd { font-weight: 600; text-align: center; margin: 14px 0; min-height: 1.2em; }
+  #msgEd.ko { color: var(--koink); } #msgEd.ok { color: var(--okink); }
+  #panneauTags { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; margin: 10px 0; }
+  #panneauTags .lg { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  #panneauTags .lg span { flex: 1; }
+  .attente { background: var(--warnbg); color: var(--warnink); border-radius: 10px; padding: 8px 12px; margin: 8px 0; font-size: 14px; }
 </style>
 </head>
 <body>
 <div class="page" id="page">
   <div class="haut"><a href="./">← Accueil</a></div>
-  <details class="ajout" id="ajout">
-    <summary>+ Ajouter un fournisseur</summary>
-    <form id="formAjout" autocomplete="off">
-      <div class="grille2">
-        <div><label for="aNom">Fournisseur *</label><input class="champ" id="aNom"></div>
-        <div><label for="aMetier">Métier</label><input class="champ" id="aMetier" list="listeMetiers" placeholder="Caoutchouc, silicone, métaux…"><datalist id="listeMetiers"></datalist></div>
-        <div><label for="aType">Type</label><select class="champ" id="aType"><option>Matière première</option><option>Produit fini</option><option>Autre</option></select></div>
-        <div style="grid-column:1/-1"><label for="aTags">Tags (séparés par des virgules)</label><input class="champ" id="aTags" placeholder="bande modulaire, plastique, polyéthylène"></div>
-        <div><label for="aContact">Contact</label><input class="champ" id="aContact"></div>
-        <div><label for="aTel">Téléphone</label><input class="champ" id="aTel" inputmode="tel"></div>
-        <div><label for="aEmail">Email</label><input class="champ" id="aEmail" inputmode="email"></div>
-        <div style="grid-column:1/-1"><label for="aNotes">Notes</label><input class="champ" id="aNotes"></div>
-      </div>
-      <button type="submit" class="btn vert" style="margin-top:12px">Enregistrer le fournisseur</button>
-      <div id="msgAjout"></div>
-    </form>
-  </details>
-  <input class="recherche" id="q" type="search" placeholder="Que cherches-tu ? ex : modulaire plastique" autocomplete="off">
+  <div class="barre">
+    <div class="bascule" id="bascule"><button type="button" data-m="fiches">Fiches</button><button type="button" data-m="tableau">Tableau</button></div>
+    <span class="sp"></span>
+    <button type="button" class="btn vert" id="btnNouveau">+ Nouveau fournisseur</button>
+  </div>
+  <input class="recherche" id="q" type="search" placeholder="Que cherches-tu ? ex : courroie modulaire" autocomplete="off">
   <div class="pills" id="pills"></div>
-  <div class="nuage" id="nuage" hidden></div>
+  <div class="nuage ferme" id="nuage" hidden></div>
+  <button type="button" class="plus" id="plus" hidden>Voir tous les tags ▾</button>
+  <div id="panneauTags" hidden></div>
+  <div id="attente" class="attente" hidden></div>
   <div id="erreur" class="erreurPage" hidden></div>
   <div class="nb" id="nb"></div>
   <div class="liste" id="liste"></div>
+  <div class="tableau" id="tableau" hidden></div>
 </div>
+
+<div id="editeur" hidden>
+  <div class="cadre">
+    <h2 id="edTitre">Fournisseur</h2>
+    <label for="eNom">Nom du fournisseur *</label><input class="champ" id="eNom" maxlength="120">
+    <label>Familles <small style="font-weight:400;color:var(--mute)">(Entrée ou virgule pour valider)</small></label><div class="chips" id="eFamilles"></div>
+    <label>Tags <small style="font-weight:400;color:var(--mute)">(propositions des tags existants)</small></label><div class="chips" id="eTags"></div>
+    <label>Contacts</label><div class="multi" id="eContacts"></div>
+    <label>Téléphones</label><div class="multi" id="eTels"></div>
+    <label>Emails</label><div class="multi" id="eMails"></div>
+    <label for="eNotes">Notes</label><textarea class="champ" id="eNotes" rows="3" maxlength="1000"></textarea>
+    <div id="msgEd"></div>
+    <datalist id="dlFamilles"></datalist><datalist id="dlTags"></datalist>
+  </div>
+  <div class="bas">
+    <button type="button" class="btn" id="edAnnuler">Annuler</button>
+    <button type="button" class="btn vert" id="edSauver">Enregistrer</button>
+    <button type="button" class="btn" id="edSuppr" hidden style="color:var(--koink)">Supprimer</button>
+  </div>
+</div>
+
 <script src="config.js"></script>
 <script src="commun.js"></script>
 <script src="shell.js"></script>
 <script>
-let tous = [], metier = '';
+let tous = [], tagsLibres = [], famille = '', tagActif = '', mode = 'fiches', tri = { k: 'nom', sens: 1 }, courant = null;
 const el = id => document.getElementById(id);
 const norm = s => Nova.norm(s);
 const mots = s => norm(s).split(/[^a-z0-9]+/).filter(Boolean);
+const fr = (a, b) => String(a).localeCompare(String(b), 'fr');
+try { mode = localStorage.getItem('fournisseursMode') === 'tableau' ? 'tableau' : 'fiches'; } catch (e) {}
+function h(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
 
-function distance(a, b) {   // Levenshtein, borné à 2
+function distance(a, b) {
   if (Math.abs(a.length - b.length) > 1) return 2;
   const m = a.length, n = b.length; let prev = Array.from({ length: n + 1 }, (_, j) => j);
   for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
   return prev[n];
 }
 function scoreMot(f, t) {
-  let sc = 0;
   const test = (liste, pts) => {
     for (const w of liste) {
       if (w === t) return pts;
@@ -95,102 +150,231 @@ function scoreMot(f, t) {
     }
     return 0;
   };
-  sc = Math.max(test(f._tags, 3), test(f._nom, 3), test(f._metier, 2), test(f._type, 1), test(f._notes, 1));
-  return sc;
+  return Math.max(test(f._tags, 3), test(f._nom, 3), test(f._fam, 2), test(f._autres, 1));
 }
 function preparer(l) {
-  l._tags = l.tags.flatMap(mots); l._nom = mots(l.nom); l._metier = mots(l.metier); l._type = mots(l.type); l._notes = mots(l.notes + ' ' + l.contact);
+  l._tags = l.tags.flatMap(mots); l._nom = mots(l.nom); l._fam = l.familles.flatMap(mots);
+  l._autres = mots(l.notes + ' ' + l.contacts.join(' ') + ' ' + l.mails.join(' '));
   return l;
 }
-
 function resultats() {
   const q = mots(el('q').value);
-  let liste = tous.filter(f => !metier || norm(f.metier) === norm(metier));
-  if (!q.length) return liste.map(f => ({ f, n: 0, sc: 0 })).sort((a, b) => a.f.nom.localeCompare(b.f.nom, 'fr'));
+  const liste = tous.filter(f => (!famille || f.familles.some(x => norm(x) === norm(famille))) && (!tagActif || f.tags.some(x => norm(x) === norm(tagActif))));
+  if (!q.length) return liste.map(f => ({ f, n: 0 }));
   const out = [];
   liste.forEach(f => {
     let sc = 0, n = 0;
     q.forEach(t => { const s = scoreMot(f, t); if (s > 0) { sc += s; n++; } });
-    if (n) out.push({ f, n, sc: sc + n * 5 });
+    if (n === q.length) out.push({ f, n, sc: sc + n * 5 });
   });
-  return out.sort((a, b) => b.sc - a.sc || a.f.nom.localeCompare(b.f.nom, 'fr'));
+  return out.sort((a, b) => b.sc - a.sc || fr(a.f.nom, b.f.nom));
 }
+function telHref(t) { return 'tel:' + t.replace(/[^\d+]/g, ''); }
 
 function dessiner() {
   const q = mots(el('q').value);
-  // pastilles de métiers
-  const metiers = [...new Set(tous.map(f => f.metier).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  // familles
+  const familles = [...new Set(tous.flatMap(f => f.familles))].sort(fr);
   const pills = el('pills'); pills.innerHTML = '';
-  [''].concat(metiers).forEach(m => {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'pill' + (m === metier ? ' on' : ''); b.textContent = m || 'Tous les métiers';
-    b.onclick = () => { metier = m; dessiner(); };
+  [''].concat(familles).forEach(m => {
+    const b = h('button', 'pill' + (m === famille ? ' on' : ''), m || 'Toutes'); b.type = 'button';
+    b.onclick = () => { famille = m; tagActif = ''; dessiner(); };
     pills.appendChild(b);
   });
-  const dl = el('listeMetiers'); dl.innerHTML = ''; metiers.forEach(m => { const o = document.createElement('option'); o.value = m; dl.appendChild(o); });
-  // nuage de tags (les plus utilisés)
+  // nuage : tags utilisés + tags créés à l'avance
   const compte = {};
-  tous.filter(f => !metier || norm(f.metier) === norm(metier)).forEach(f => f.tags.forEach(t => { const k = norm(t); if (!k) return; (compte[k] = compte[k] || { t, n: 0 }).n++; }));
-  const top = Object.values(compte).sort((a, b) => b.n - a.n || a.t.localeCompare(b.t, 'fr')).slice(0, 40);
+  tous.filter(f => !famille || f.familles.some(x => norm(x) === norm(famille))).forEach(f => f.tags.forEach(t => { const k = norm(t); (compte[k] = compte[k] || { t, n: 0 }).n++; }));
+  if (!famille) tagsLibres.forEach(t => { const k = norm(t); if (!compte[k]) compte[k] = { t, n: 0 }; });
+  const tags = Object.values(compte).sort((a, b) => fr(a.t, b.t));
   const nuage = el('nuage'); nuage.innerHTML = '';
-  nuage.hidden = top.length === 0;
-  if (top.length) {
-    const t = document.createElement('div'); t.className = 't'; t.textContent = 'Tags les plus utilisés : touche-en un pour chercher'; nuage.appendChild(t);
-    const max = top[0].n;
-    top.slice().sort((a, b) => a.t.localeCompare(b.t, 'fr')).forEach(x => {
-      const b = document.createElement('button'); b.type = 'button'; b.textContent = x.t;
-      b.style.fontSize = (14 + Math.round(10 * x.n / max)) + 'px';
-      b.className = q.indexOf(norm(x.t)) >= 0 ? 'on' : '';
-      b.onclick = () => { const cur = el('q').value.trim(); const k = norm(x.t); el('q').value = norm(cur).indexOf(k) >= 0 ? cur.split(/\s+/).filter(w => norm(w) !== k).join(' ') : (cur + ' ' + x.t).trim(); dessiner(); };
-      nuage.appendChild(b);
-    });
-  }
+  nuage.hidden = el('plus').hidden = false;
+  const t0 = h('div', 't'); t0.appendChild(h('span', null, 'Touche un tag pour filtrer'));
+  const bNew = h('button', null, '+ Nouveau tag'); bNew.type = 'button'; bNew.onclick = creerTag; t0.appendChild(bNew);
+  if (Nova.peut('admin')) { const bG = h('button', null, 'Gérer les tags'); bG.type = 'button'; bG.onclick = gererTags; t0.appendChild(bG); }
+  nuage.appendChild(t0);
+  const max = Math.max(1, ...tags.map(x => x.n));
+  tags.forEach(x => {
+    const b = h('button', norm(x.t) === norm(tagActif) ? 'on' : ''); b.type = 'button';
+    b.textContent = x.t + ' '; b.appendChild(h('sup', null, x.n));
+    b.style.fontSize = (14 + Math.round(8 * x.n / max)) + 'px';
+    b.onclick = () => { tagActif = norm(x.t) === norm(tagActif) ? '' : x.t; dessiner(); };
+    nuage.appendChild(b);
+  });
   // résultats
   const res = resultats();
-  el('nb').textContent = tous.length === 0 ? 'Aucun fournisseur dans l\'annuaire pour l\'instant.' : res.length + (res.length > 1 ? ' fournisseurs' : ' fournisseur') + (q.length ? ' pour « ' + el('q').value.trim() + ' »' : '');
+  if (mode === 'tableau') res.sort((a, b) => { const A = cle(a.f), B = cle(b.f); return (typeof A === 'number' ? A - B : fr(A, B)) * tri.sens; });
+  el('nb').textContent = tous.length === 0 ? 'Aucun fournisseur dans l\'annuaire pour l\'instant.' : res.length + (res.length > 1 ? ' fournisseurs' : ' fournisseur') + (tagActif ? ' · tag « ' + tagActif + ' »' : '');
+  document.querySelectorAll('#bascule button').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+  el('liste').hidden = mode !== 'fiches'; el('tableau').hidden = mode !== 'tableau';
+  el('liste').innerHTML = ''; el('tableau').innerHTML = '';
+  if (mode === 'fiches') dessinerFiches(res, q); else dessinerTableau(res);
+}
+
+function dessinerFiches(res, q) {
   const zone = el('liste'); zone.innerHTML = '';
-  res.slice(0, 200).forEach(({ f, n }) => {
-    const c = document.createElement('div'); c.className = 'four';
-    const h = document.createElement('h3'); const nom = document.createElement('span'); nom.textContent = f.nom; h.appendChild(nom);
-    if (q.length > 1) { const s = document.createElement('small'); s.textContent = n + '/' + q.length + ' mots'; h.appendChild(s); }
-    c.appendChild(h);
-    const meta = document.createElement('div'); meta.className = 'meta';
-    [f.metier && ['metier', f.metier], f.type && ['', f.type]].filter(Boolean).forEach(([k, t]) => { const s = document.createElement('span'); s.className = 'tag ' + k; s.textContent = t; meta.appendChild(s); });
-    f.tags.forEach(t => { const s = document.createElement('span'); s.className = 'tag' + (q.some(w => scoreMot({ _tags: mots(t), _nom: [], _metier: [], _type: [], _notes: [] }, w) > 0) ? ' hit' : ''); s.textContent = t; meta.appendChild(s); });
+  res.slice(0, 300).forEach(({ f }) => {
+    const c = h('div', 'four');
+    const t = h('h3'); t.appendChild(h('span', null, f.nom));
+    const m = h('button', 'btnMod', 'Modifier'); m.type = 'button'; m.onclick = () => ouvrirEditeur(f); t.appendChild(m); c.appendChild(t);
+    const meta = h('div', 'meta');
+    f.familles.forEach(x => meta.appendChild(h('span', 'tag fam', x)));
+    f.tags.forEach(x => meta.appendChild(h('span', 'tag' + (q.some(w => scoreMot({ _tags: mots(x), _nom: [], _fam: [], _autres: [] }, w) > 0) ? ' hit' : ''), x)));
     c.appendChild(meta);
-    const ct = document.createElement('div'); ct.className = 'contact';
-    const ligne = [];
-    if (f.contact) ligne.push(document.createTextNode(f.contact));
-    if (f.tel) { const a = document.createElement('a'); a.href = 'tel:' + f.tel.replace(/[^\d+]/g, ''); a.textContent = f.tel; ligne.push(a); }
-    if (f.email) { const a = document.createElement('a'); a.href = 'mailto:' + f.email; a.textContent = f.email; ligne.push(a); }
-    ligne.forEach((n2, i) => { if (i) ct.appendChild(document.createTextNode(' · ')); ct.appendChild(n2); });
-    if (ligne.length) c.appendChild(ct);
-    if (f.notes) { const n3 = document.createElement('div'); n3.className = 'notes'; n3.textContent = f.notes; c.appendChild(n3); }
+    if (f.contacts.length) c.appendChild(h('div', 'ct', '👤 ' + f.contacts.join(' · ')));
+    const a = h('div', 'actions');
+    f.tels.forEach(x => { const l = h('a', 'tel', '📞 ' + x); l.href = telHref(x); a.appendChild(l); });
+    f.mails.forEach(x => { const l = h('a', 'mail', '✉️ ' + x); l.href = 'mailto:' + x; a.appendChild(l); });
+    if (a.children.length) c.appendChild(a); else c.appendChild(h('div', 'vide', 'Coordonnées à compléter'));
+    if (f.notes) c.appendChild(h('div', 'notes', f.notes));
     zone.appendChild(c);
   });
 }
 
+const COLS = [['nom', 'Fournisseur'], ['fam', 'Familles'], ['tags', 'Tags'], ['contacts', 'Contacts'], ['tels', 'Téléphones'], ['mails', 'Emails'], ['notes', 'Notes']];
+function cle(f) { return { nom: f.nom, fam: f.familles.join(' '), tags: f.tags.join(' '), contacts: f.contacts.join(' '), tels: f.tels.join(' '), mails: f.mails.join(' '), notes: f.notes }[tri.k] || ''; }
+function dessinerTableau(res) {
+  const zone = el('tableau'); zone.innerHTML = '';
+  const t = h('table', 't'), hd = h('thead'), tr = h('tr');
+  COLS.forEach(([k, lib]) => { const th = h('th', null, lib + (tri.k === k ? (tri.sens > 0 ? ' ▲' : ' ▼') : '')); th.onclick = () => { tri = { k, sens: tri.k === k ? -tri.sens : 1 }; dessiner(); }; tr.appendChild(th); });
+  tr.appendChild(h('th', null, '')); hd.appendChild(tr); t.appendChild(hd);
+  const tb = h('tbody');
+  res.forEach(({ f }) => {
+    const r = h('tr');
+    r.appendChild(h('td', null, f.nom));
+    r.appendChild(h('td', null, f.familles.join(', ')));
+    r.appendChild(h('td', null, f.tags.join(', ')));
+    r.appendChild(h('td', null, f.contacts.join('\n'))).style.whiteSpace = 'pre-line';
+    const tt = h('td'); f.tels.forEach(x => { const a = h('a', null, x); a.href = telHref(x); tt.appendChild(a); }); r.appendChild(tt);
+    const tm = h('td'); f.mails.forEach(x => { const a = h('a', null, x); a.href = 'mailto:' + x; tm.appendChild(a); }); r.appendChild(tm);
+    r.appendChild(h('td', null, f.notes));
+    const ta = h('td'); const b = h('button', 'btnMod', 'Modifier'); b.type = 'button'; b.onclick = () => ouvrirEditeur(f); ta.appendChild(b); r.appendChild(ta);
+    tb.appendChild(r);
+  });
+  t.appendChild(tb); zone.appendChild(t);
+}
+
+// ---------- éditeur ----------
+function chips(zoneId, valeurs, dlId) {
+  const z = el(zoneId); z.innerHTML = '';
+  const liste = valeurs.slice();
+  const inp = h('input'); inp.setAttribute('list', dlId); inp.placeholder = 'Ajouter...';
+  function redessiner() {
+    z.querySelectorAll('.c').forEach(c => c.remove());
+    liste.forEach((v, i) => { const s = h('span', 'c', v); const x = h('b', null, '×'); x.onclick = () => { liste.splice(i, 1); redessiner(); }; s.appendChild(x); z.insertBefore(s, inp); });
+  }
+  function ajouter() { inp.value.split(/[,;]+/).map(x => x.trim()).filter(Boolean).forEach(v => { if (!liste.some(x => norm(x) === norm(v))) liste.push(v); }); inp.value = ''; redessiner(); }
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); ajouter(); } else if (e.key === 'Backspace' && !inp.value && liste.length) { liste.pop(); redessiner(); } });
+  inp.addEventListener('change', ajouter); inp.addEventListener('blur', ajouter);
+  z.appendChild(inp); redessiner();
+  z.valeurs = () => { ajouter(); return liste.slice(); };
+}
+function multi(zoneId, valeurs, type, place) {
+  const z = el(zoneId); z.innerHTML = '';
+  function ligne(v) {
+    const l = h('div', 'lig'); const i = h('input', 'champ'); i.type = type; i.value = v || ''; i.placeholder = place;
+    const x = h('button', 'btnPetit', '×'); x.type = 'button'; x.onclick = () => { l.remove(); };
+    l.appendChild(i); l.appendChild(x); z.insertBefore(l, z.querySelector('.ajouter'));
+  }
+  const add = h('button', 'btnPetit ajouter', '+ Ajouter'); add.type = 'button'; add.onclick = () => { ligne(''); z.querySelectorAll('input')[z.querySelectorAll('input').length - 1].focus(); };
+  z.appendChild(add);
+  (valeurs.length ? valeurs : ['']).forEach(ligne);
+  z.valeurs = () => [...z.querySelectorAll('input')].map(i => i.value.trim()).filter(Boolean);
+}
+function ouvrirEditeur(f) {
+  courant = f || null;
+  el('edTitre').textContent = f ? 'Modifier ' + f.nom : 'Nouveau fournisseur';
+  el('eNom').value = f ? f.nom : '';
+  const fam = [...new Set(tous.flatMap(x => x.familles))].sort(fr);
+  const tg = [...new Set(tous.flatMap(x => x.tags).concat(tagsLibres))].sort(fr);
+  el('dlFamilles').innerHTML = ''; fam.forEach(x => { const o = document.createElement('option'); o.value = x; el('dlFamilles').appendChild(o); });
+  el('dlTags').innerHTML = ''; tg.forEach(x => { const o = document.createElement('option'); o.value = x; el('dlTags').appendChild(o); });
+  chips('eFamilles', f ? f.familles : [], 'dlFamilles'); chips('eTags', f ? f.tags : [], 'dlTags');
+  multi('eContacts', f ? f.contacts : [], 'text', 'Prénom NOM'); multi('eTels', f ? f.tels : [], 'tel', '04 00 00 00 00'); multi('eMails', f ? f.mails : [], 'email', 'nom@societe.fr');
+  el('eNotes').value = f ? f.notes : '';
+  el('msgEd').textContent = ''; el('msgEd').className = '';
+  el('edSuppr').hidden = !(f && f.ligne && Nova.peut('admin'));
+  el('editeur').hidden = false; el('page').hidden = true; window.scrollTo(0, 0);
+}
+function fermerEditeur() { el('editeur').hidden = true; el('page').hidden = false; courant = null; }
+el('btnNouveau').onclick = () => ouvrirEditeur(null);
+el('edAnnuler').onclick = fermerEditeur;
+
+function memoriser() { try { localStorage.setItem('fournisseursCache', JSON.stringify({ lignes: tous.map(f => { const c = Object.assign({}, f); Object.keys(c).filter(k => k[0] === '_').forEach(k => delete c[k]); return c; }), tagsLibres })); } catch (e) {} }
+
+el('edSauver').onclick = async () => {
+  const msg = el('msgEd'), nom = el('eNom').value.trim();
+  if (!nom) { msg.className = 'ko'; msg.textContent = 'Le nom du fournisseur est obligatoire.'; el('eNom').focus(); return; }
+  if (tous.some(x => norm(x.nom) === norm(nom) && (!courant || x.ligne !== courant.ligne || x.nom !== courant.nom))) { msg.className = 'ko'; msg.textContent = 'Ce fournisseur existe déjà dans l\'annuaire.'; return; }
+  const f = { ligne: courant ? courant.ligne : 0, ancienNom: courant ? courant.nom : '', nom, familles: el('eFamilles').valeurs(), tags: el('eTags').valeurs(), contacts: el('eContacts').valeurs(), tels: el('eTels').valeurs(), mails: el('eMails').valeurs(), notes: el('eNotes').value.trim() };
+  msg.className = ''; msg.textContent = 'Enregistrement...'; el('edSauver').disabled = true;
+  try {
+    const r = await Nova.envoyerOuGarder('fourSauver', { fournisseur: f }, 'Fournisseur ' + nom, 30000);
+    if (r.enAttente) {   // affichage immédiat en attendant le réseau
+      if (courant) { const i = tous.indexOf(courant); if (i >= 0) tous[i] = preparer(Object.assign({}, courant, f, { ligne: courant.ligne })); }
+      else tous.push(preparer(Object.assign({}, f, { ligne: 0 })));
+      memoriser();
+    }
+    fermerEditeur();
+    if (!r.enAttente) await charger();
+    else { dessiner(); majAttente(); }
+  } catch (e) { msg.className = 'ko'; msg.textContent = e.message; }
+  el('edSauver').disabled = false;
+};
+el('edSuppr').onclick = async () => {
+  if (!courant || !confirm('Supprimer définitivement « ' + courant.nom + ' » de l\'annuaire ?')) return;
+  try { await Nova.api('fourSupprimer', { ligne: courant.ligne, nom: courant.nom }, 20000); fermerEditeur(); await charger(); }
+  catch (e) { el('msgEd').className = 'ko'; el('msgEd').textContent = e.code === 'reseau' ? 'La suppression demande le réseau.' : e.message; }
+};
+
+// ---------- tags ----------
+async function creerTag() {
+  const t = (prompt('Nom du nouveau tag :') || '').trim();
+  if (!t) return;
+  try { const r = await Nova.envoyerOuGarder('fourTagAjouter', { tag: t }, 'Tag ' + t, 20000); if (!tagsLibres.some(x => norm(x) === norm(t))) tagsLibres.push(t); memoriser(); if (!r.enAttente) await charger(); else dessiner(); }
+  catch (e) { alert(e.message); }
+}
+function gererTags() {
+  const p = el('panneauTags'); p.hidden = !p.hidden; if (p.hidden) return;
+  p.innerHTML = ''; p.appendChild(h('b', null, 'Renommer ou fusionner un tag (tous les fournisseurs concernés sont mis à jour)'));
+  const compte = {}; tous.forEach(f => f.tags.forEach(t => { compte[t] = (compte[t] || 0) + 1; })); tagsLibres.forEach(t => { if (!(t in compte)) compte[t] = 0; });
+  Object.keys(compte).sort(fr).forEach(t => {
+    const l = h('div', 'lg'); l.appendChild(h('span', null, t + ' (' + compte[t] + ')'));
+    const b = h('button', 'btnPetit', 'Renommer'); b.type = 'button';
+    b.onclick = async () => {
+      const n = (prompt('Nouveau nom pour « ' + t + ' » (un nom déjà existant fusionne les deux) :', t) || '').trim();
+      if (!n || n === t) return;
+      try { await Nova.api('fourTagRenommer', { ancien: t, nouveau: n }, 30000); p.hidden = true; await charger(); } catch (e) { alert(e.code === 'reseau' ? 'Cette action demande le réseau.' : e.message); }
+    };
+    l.appendChild(b); p.appendChild(l);
+  });
+}
+
+function majAttente() {
+  const l = Nova.lireFile().filter(x => /^four/.test(x.action));
+  const a = el('attente'); a.hidden = !l.length;
+  a.textContent = l.length + (l.length > 1 ? ' modifications en attente d\'envoi' : ' modification en attente d\'envoi') + ' : elles partiront dès le retour du réseau.' + (l.some(x => x.erreur) ? ' ⚠ Refusée : ' + l.find(x => x.erreur).erreur : '');
+}
+document.addEventListener('nova:file', e => { majAttente(); if (e.detail && e.detail.envoyes) charger(); });
+
+el('bascule').onclick = e => { const m = e.target.dataset && e.target.dataset.m; if (!m) return; mode = m; try { localStorage.setItem('fournisseursMode', m); } catch (x) {} dessiner(); };
+el('plus').onclick = () => { const n = el('nuage'); n.classList.toggle('ferme'); el('plus').textContent = n.classList.contains('ferme') ? 'Voir tous les tags ▾' : 'Réduire ▴'; };
+el('q').addEventListener('input', dessiner);
+
+function appliquer(r) {
+  const lignes = Array.isArray(r) ? r.map(l => ({ ligne: l.ligne, nom: l.nom, familles: l.metier ? [l.metier] : [], tags: l.tags || [], contacts: l.contact ? [l.contact] : [], tels: l.tel ? [l.tel] : [], mails: l.email ? [l.email] : [], notes: l.notes || '' })) : r.lignes;
+  tous = lignes.map(l => preparer(Object.assign({ familles: [], tags: [], contacts: [], tels: [], mails: [], notes: '' }, l))); tagsLibres = (r && r.tagsLibres) || [];
+}
 async function charger() {
   if (!Nova.exiger('fournisseurs')) return;
-  try { const memo = JSON.parse(localStorage.getItem('fournisseursCache')); if (Array.isArray(memo)) { tous = memo.map(preparer); dessiner(); } } catch (e) {}
+  if (!tous.length) { try { const memo = JSON.parse(localStorage.getItem('fournisseursCache')); if (memo) { appliquer(memo); dessiner(); } } catch (e) {} }
+  majAttente();
   try {
     const r = await Nova.api('fourListe', null, 20000);
-    tous = r.lignes.map(preparer);
-    try { localStorage.setItem('fournisseursCache', JSON.stringify(r.lignes)); } catch (e) {}
+    appliquer(r); memoriser();
     el('erreur').hidden = true;
     dessiner();
-  } catch (e) { if (!tous.length) { el('erreur').textContent = e.message; el('erreur').hidden = false; } }
+  } catch (e) { if (!tous.length) { el('erreur').textContent = e.message; el('erreur').hidden = false; } else dessiner(); }
 }
-el('q').addEventListener('input', dessiner);
-el('formAjout').addEventListener('submit', async ev => {
-  ev.preventDefault();
-  const m = el('msgAjout'); m.className = ''; m.textContent = 'Enregistrement...';
-  try {
-    const rf = await Nova.envoyerOuGarder('fourAjouter', { fournisseur: { nom: el('aNom').value, metier: el('aMetier').value, type: el('aType').value, tags: el('aTags').value, contact: el('aContact').value, tel: el('aTel').value, email: el('aEmail').value, notes: el('aNotes').value } }, 'Fournisseur ' + el('aNom').value, 20000);
-    m.className = 'ok'; m.textContent = rf.enAttente ? '✓ Pas de réseau : fournisseur gardé sur l\'appareil, il partira au retour du réseau.' : '✓ Fournisseur ajouté.';
-    el('formAjout').reset();
-    if (!rf.enAttente) await charger();
-  } catch (e) { m.className = 'ko'; m.textContent = e.message; }
-});
 charger();
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 </script>

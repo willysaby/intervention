@@ -84,6 +84,7 @@
         '<button type="button" class="enteteBtn" id="btnTheme" aria-label="Changer de thème"></button>';
       document.body.insertBefore(h, document.body.firstChild);
       h.querySelector('#enteteSous').textContent = TITRES_PAGES[fichierCourant()] || SOUS_TITRES[actif] || '';
+      ['.enteteLogo', '.enteteTitres'].forEach(function (q) { const e = h.querySelector(q); e.style.cursor = 'pointer'; e.setAttribute('role', 'link'); e.setAttribute('aria-label', 'Retour à l\'accueil'); e.onclick = function () { location.href = './'; }; });
       h.querySelector('#btnRecharger').onclick = function () { location.reload(); };
       const bt = h.querySelector('#btnTheme');
       const maj = function () { bt.innerHTML = svg(themeEffectif() === 'sombre' ? 'sun' : 'moon', 22); };
