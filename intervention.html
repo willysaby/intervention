@@ -52,6 +52,13 @@
   .horaire span { font-weight: 700; }
   .erreurTech { color: #d33; font-weight: 600; font-size: 14px; padding: 10px 0; }
   .erreurTech button { margin-top: 8px; padding: 8px 12px; font-size: 15px; border: 1px solid var(--line); background: var(--card); border-radius: 8px; color: var(--ink); }
+  .photoBtns { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+  .photoBtns .eff { flex: 1; min-width: 150px; }
+  #vignettes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .vig { position: relative; width: 92px; height: 92px; border-radius: 10px; overflow: hidden; border: 1px solid #bbb; }
+  .vig img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vig b { position: absolute; top: 3px; right: 3px; width: 26px; height: 26px; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; display: grid; place-items: center; font-size: 16px; cursor: pointer; }
+  .aidePhotos { font-size: 13px; color: #777; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -94,12 +101,25 @@
 </div>
 
 <div class="carte">
+  <label>Photos (facultatif)</label>
+  <div class="photoBtns">
+    <button type="button" class="eff" id="btnPrendre">📷 Prendre une photo</button>
+    <button type="button" class="eff" id="btnChoisir">🖼 Choisir dans la galerie</button>
+  </div>
+  <input type="file" id="inpPrendre" accept="image/*" capture="environment" hidden>
+  <input type="file" id="inpChoisir" accept="image/*" multiple hidden>
+  <div id="vignettes"></div>
+  <div id="infoPhotos" class="aidePhotos">Jusqu'à 8 photos, réduites automatiquement. Elles seront jointes en page 2 du bon.</div>
+</div>
+
+<div class="carte">
   <label>Nom du signataire</label><input id="nomSignataire" placeholder="Nom et prénom de la personne qui signe">
   <label>Signature du client</label>
   <canvas id="sign"></canvas>
   <button class="eff" onclick="effacerSignature()">Effacer la signature</button>
   <label>Email du client (pour recevoir le bon)</label>
-  <input type="email" id="emailClient" placeholder="client@exemple.fr">
+  <input type="text" inputmode="email" autocapitalize="off" id="emailClient" placeholder="client@exemple.fr ; autre@exemple.fr">
+  <div class="aidePhotos">Plusieurs adresses possibles : sépare-les par une virgule ou un point-virgule.</div>
 </div>
 
 <div class="carte">
@@ -389,6 +409,56 @@ canvas.addEventListener('pointermove', e => { if (!dessine) return; const p = po
 window.addEventListener('pointerup', () => dessine = false);
 function effacerSignature() { ctx.clearRect(0, 0, canvas.width, canvas.height); aSigne = false; }
 
+/* ---------- Photos (réduites avant envoi) ---------- */
+const PHOTOS_MAX = 8, PHOTO_TAILLE_CIBLE = 270000;   // ~200 Ko par photo
+let photos = [];
+function chargerImage(fichier) {
+  return new Promise((ok, ko) => {
+    const url = URL.createObjectURL(fichier), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); ok(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); ko(new Error('image illisible')); };
+    img.src = url;
+  });
+}
+async function compresserPhoto(fichier) {
+  const img = await chargerImage(fichier);
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  let cote = 1280, q = 0.72;
+  for (;;) {
+    const k = Math.min(1, cote / Math.max(img.width, img.height));
+    c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+    const url = c.toDataURL('image/jpeg', q);
+    if (url.length <= PHOTO_TAILLE_CIBLE || (cote <= 800 && q <= 0.5)) return url;
+    if (q > 0.55) q -= 0.08; else { cote = cote > 1000 ? 1000 : 800; q = 0.65; }
+  }
+}
+function dessinerPhotos() {
+  const z = document.getElementById('vignettes'); z.innerHTML = '';
+  photos.forEach((p, i) => {
+    const d = document.createElement('div'); d.className = 'vig';
+    const im = document.createElement('img'); im.src = p; d.appendChild(im);
+    const x = document.createElement('b'); x.textContent = '×'; x.onclick = () => { photos.splice(i, 1); dessinerPhotos(); }; d.appendChild(x);
+    z.appendChild(d);
+  });
+  const ko = Math.round(photos.reduce((s, p) => s + p.length * 0.75, 0) / 1024);
+  document.getElementById('infoPhotos').textContent = photos.length
+    ? photos.length + ' photo' + (photos.length > 1 ? 's' : '') + ' (' + ko + ' Ko au total) : jointes en page 2 du bon.'
+    : 'Jusqu\'à ' + PHOTOS_MAX + ' photos, réduites automatiquement. Elles seront jointes en page 2 du bon.';
+}
+async function ajouterPhotos(liste) {
+  const info = document.getElementById('infoPhotos');
+  for (const f of liste) {
+    if (photos.length >= PHOTOS_MAX) { info.textContent = 'Maximum ' + PHOTOS_MAX + ' photos.'; break; }
+    info.textContent = 'Réduction de la photo...';
+    try { photos.push(await compresserPhoto(f)); } catch (e) { info.textContent = 'Photo illisible, essaie-en une autre.'; return; }
+    dessinerPhotos();
+  }
+}
+document.getElementById('btnPrendre').onclick = () => document.getElementById('inpPrendre').click();
+document.getElementById('btnChoisir').onclick = () => document.getElementById('inpChoisir').click();
+['inpPrendre', 'inpChoisir'].forEach(id => document.getElementById(id).addEventListener('change', e => { const l = [...e.target.files]; e.target.value = ''; ajouterPhotos(l); }));
+
 /* ---------- Validation ---------- */
 async function valider() {
   const msg = document.getElementById('message');
@@ -399,6 +469,9 @@ async function valider() {
   const technicien = (autreTech ? coches.concat(autreTech) : coches).join(', ');
   const emailClient = document.getElementById('emailClient').value.trim();
   if (!client || !technicien || !emailClient) { msg.textContent = 'Client, au moins un technicien et email sont obligatoires.'; return; }
+  const adr = emailClient.split(/[,;\s]+/).filter(Boolean);
+  if (!adr.length || adr.some(a => !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a))) { msg.textContent = 'Adresse email invalide : vérifie-la (plusieurs adresses séparées par une virgule ou un point-virgule).'; return; }
+  if (adr.length > 5) { msg.textContent = '5 adresses email au maximum.'; return; }
   if (!nomSignataire) { msg.textContent = 'Le nom du signataire est obligatoire.'; return; }
   if (!aSigne) { msg.textContent = 'La signature du client est obligatoire.'; return; }
 
@@ -417,6 +490,7 @@ async function valider() {
     heureArrivee: lireHoraire('arrivee'),
     heureFin: lireHoraire('fin'),
     signature: canvas.toDataURL('image/png'),
+    photos: photos.slice(),
     docId: DOC_ID
   };
 
