@@ -134,11 +134,16 @@ async function synchro() {
   if (!navigator.onLine) return;
   $("#etat").textContent += " · synchronisation…";
   try {
-    const r = await fetch(API_URL + "?code=" + encodeURIComponent(code()) + "&t=" + Date.now(), {cache: "no-store"});
+    // compte personnel : le code de consultation et le code administrateur sont differents, on interroge avec l'administrateur s'il est connu
+    const essai = ADMIN || code();
+    const r = await fetch(API_URL + "?code=" + encodeURIComponent(essai) + "&t=" + Date.now(), {cache: "no-store"});
     const j = await r.json();
-    if (j.error === "code") { CODE = ""; try { localStorage.removeItem("code"); } catch (e) {} $("#etat").textContent = "Code incorrect, rouvre l’appli."; return; }
+    if (j.error === "code") {
+      if (ADMIN) { ADMIN = ""; try { localStorage.removeItem("admin"); } catch (e) {} return synchro(); }
+      CODE = ""; try { localStorage.removeItem("code"); } catch (e) {} $("#etat").textContent = "Code incorrect, rouvre l’appli."; return;
+    }
     rows = j.rows;
-    if (j.admin) { ADMIN = CODE; try { localStorage.setItem("admin", CODE); } catch (e) {} }
+    if (j.admin) { ADMIN = essai; try { localStorage.setItem("admin", essai); } catch (e) {} }
     else { ADMIN = ""; try { localStorage.removeItem("admin"); } catch (e) {} }
     maj = new Date().toLocaleString("fr-FR", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"});
     localStorage.setItem("cache", JSON.stringify({rows, maj}));
