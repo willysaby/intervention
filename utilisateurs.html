@@ -59,6 +59,13 @@
   .app .qui2 { flex: 1; min-width: 150px; }
   .bas { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 8px; justify-content: center; z-index: 60; }
   .bas .btn { min-width: 140px; }
+  #stopBox { margin: 0 0 16px; }
+  .stopGros { width: 100%; border: 0; border-radius: 18px; padding: 20px; font-family: inherit; font-size: 20px; font-weight: 800; background: #c62828; color: #fff; box-shadow: 0 6px 18px rgba(198,40,40,.3); }
+  .stopGros.confirme { background: #7f1010; }
+  .stopGros.vert { background: var(--vert); box-shadow: 0 6px 18px rgba(14,144,98,.25); }
+  .stopRouge { background: var(--kobg); color: var(--koink); border: 2px solid var(--koink); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; font-weight: 700; }
+  .stopInfo { color: var(--mute); font-size: 13px; text-align: center; margin-top: 8px; }
+  .stopAnnuler { display: block; margin: 8px auto 0; background: none; border: 0; color: var(--lien); font-weight: 700; font-size: 15px; padding: 8px; font-family: inherit; }
   #msgEd { font-weight: 600; text-align: center; margin: 14px 0; min-height: 1.2em; }
   #msgEd.ko { color: var(--koink); } #msgEd.ok { color: var(--okink); }
   .nouveauCode { background: var(--okbg); color: var(--okink); border-radius: 12px; padding: 14px; margin-top: 14px; font-weight: 700; text-align: center; }
@@ -68,6 +75,7 @@
 <body>
 <div class="page" id="page">
   <div class="haut"><a href="./">← Accueil</a><h1>Utilisateurs et droits</h1></div>
+  <div id="stopBox"></div>
   <div id="infos"></div>
   <div id="erreur" class="erreurPage" hidden></div>
   <div class="barre">
@@ -239,9 +247,46 @@ el('edSauver').onclick = async () => {
 };
 el('q').addEventListener('input', () => donnees && dessiner());
 
+
+/* ---------- Arrêt d'urgence des envois ---------- */
+let confirmerStop = false;
+function dessinerStop() {
+  const p = donnees && donnees.protections, z = el('stopBox');
+  if (!p) { z.innerHTML = ''; return; }
+  z.innerHTML = '';
+  if (p.bloque) {
+    const r = document.createElement('div'); r.className = 'stopRouge';
+    r.textContent = '⛔ Tous les envois de mails sont bloqués' + (p.bloquePar ? ' (par ' + p.bloquePar + (p.bloqueLe ? ', ' + p.bloqueLe : '') + ')' : '') + '. Les bons et commandes restent gardés sur les appareils.';
+    z.appendChild(r);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'stopGros vert'; b.textContent = 'Réactiver les envois';
+    b.onclick = () => changerStop(false, b);
+    z.appendChild(b);
+  } else {
+    const b = document.createElement('button'); b.type = 'button';
+    b.className = 'stopGros' + (confirmerStop ? ' confirme' : '');
+    b.textContent = confirmerStop ? 'Confirmer : bloquer tous les envois' : '⛔ Stop, on bloque tout';
+    b.onclick = () => { if (!confirmerStop) { confirmerStop = true; dessinerStop(); } else changerStop(true, b); };
+    z.appendChild(b);
+    if (confirmerStop) {
+      const a = document.createElement('button'); a.type = 'button'; a.className = 'stopAnnuler'; a.textContent = 'Annuler';
+      a.onclick = () => { confirmerStop = false; dessinerStop(); };
+      z.appendChild(a);
+    }
+    const i = document.createElement('div'); i.className = 'stopInfo';
+    i.textContent = 'Envois aujourd\'hui : ' + p.jour + ' sur ' + p.plafondJour + ' · maximum ' + p.plafondHeure + ' par heure et par personne';
+    z.appendChild(i);
+  }
+}
+async function changerStop(bloquer, bouton) {
+  bouton.disabled = true;
+  try {
+    const r = await Nova.api('usersBloquer', { bloquer: bloquer }, 20000);
+    donnees.protections = r; confirmerStop = false; dessinerStop();
+  } catch (e) { el('erreur').textContent = e.message; el('erreur').hidden = false; bouton.disabled = false; }
+}
 async function charger() {
   try { donnees = await Nova.api('usersListe', null, 20000); } catch (e) { el('erreur').textContent = e.message; el('erreur').hidden = false; return; }
-  DROITS = donnees.droits; el('erreur').hidden = true; dessiner();
+  DROITS = donnees.droits; el('erreur').hidden = true; dessiner(); dessinerStop();
 }
 // bouton « Terminer » après création : on remet l'éditeur à l'état normal
 const ferme0 = el('edFermer').onclick;

@@ -199,7 +199,7 @@
         ecrireFile(lireFile().filter(function (x) { return x.id !== it.id; }));
         envoyes++;
       } catch (e) {
-        if (e.code === 'reseau' || e.code === 'session') break;
+        if (e.code === 'reseau' || e.code === 'session' || e.code === 'stop' || e.code === 'limite') break;   // arret d'urgence / plafond : on garde et on reessaiera
         if (/^four(Ajouter|Sauver)$/.test(it.action) && /existe déjà/.test(e.message)) { ecrireFile(lireFile().filter(function (x) { return x.id !== it.id; })); envoyes++; continue; }
         ecrireFile(lireFile().map(function (x) { return x.id === it.id ? Object.assign({}, x, { erreur: e.message }) : x; }));
         erreurs++;

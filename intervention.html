@@ -180,7 +180,7 @@ async function posterBon(donnees, delai) {
   } catch (e) {
     throw creerErreur('serveur', 'Réponse inattendue du script (autorisations à accorder ou nouvelle version à déployer dans Apps Script).');
   }
-  if (!res.ok) throw creerErreur(res.code === 'session' ? 'session' : 'serveur', res.erreur || 'Erreur du script.');
+  if (!res.ok) throw creerErreur(res.code === 'session' || res.code === 'stop' || res.code === 'limite' ? res.code : 'serveur', res.erreur || 'Erreur du script.');
   return res;
 }
 
@@ -525,7 +525,9 @@ async function valider() {
     if (cible) { cible.erreur = e.message; try { ecrireAttente(l2); } catch (x) {} }
     allerAccueil('attente', e.type === 'session'
       ? 'Bon enregistré. Connecte-toi pour qu\'il parte.'
-      : 'Bon enregistré, il partira dès que le réseau le permet.');
+      : (e.type === 'stop' || e.type === 'limite')
+        ? 'Bon gardé sur l\'appareil, pas encore envoyé. ' + e.message
+        : 'Bon enregistré, il partira dès que le réseau le permet.');
   }
 }
 

@@ -44,6 +44,12 @@
   .panneauAtt { background: var(--warnbg); color: var(--warnink); border: 1px solid #e0b100; border-radius: 18px; padding: 14px 16px; margin: -4px 0 12px; display: grid; gap: 10px; }
   .panneauAtt .msg { font-weight: 600; font-size: 15px; }
   .panneauAtt .lienSuite { color: var(--warnink); font-weight: 700; text-align: center; text-decoration: none; padding: 6px; }
+  #bandeaux { display: grid; gap: 10px; margin: 12px 0 0; }
+  #bandeaux:empty { display: none; }
+  #bandeaux a { display: block; border-radius: 16px; padding: 14px 16px; text-decoration: none; font-weight: 700; font-size: 15px; line-height: 1.35; }
+  #bandeaux a small { display: block; font-weight: 500; opacity: .9; margin-top: 2px; }
+  #bandeaux a.rouge { background: var(--kobg); color: var(--koink); border: 2px solid var(--koink); }
+  #bandeaux a.orange { background: var(--warnbg); color: var(--warnink); border: 2px solid #e0b100; }
   a.gros .fl { margin-left: auto; opacity: .85; display: flex; }
   a.gros .pastille { margin-left: auto; background: #fff; color: var(--vert); border-radius: 999px; font-weight: 800; font-size: 15px; padding: 4px 12px; }
   #modules_inter, #indicateurs { grid-template-columns: 1fr; }
@@ -76,6 +82,7 @@
   <p class="sous" id="sousSalut" style="margin-top:16px">Voici l'état des interventions Novafit.</p>
   <div class="flash" id="flash" role="status" hidden></div>
   <span class="badge" id="badge">Non connecté</span>
+  <div id="bandeaux"></div>
 
   <p id="consigne">Saisis le mot de passe pour activer les applications.</p>
 
@@ -441,6 +448,21 @@ async function chargerAchats() {
 /* ---------- Utilisateurs (administrateur) : voyant orange en cas de nouvel appareil ---------- */
 function retirerCarteUsers() {
   const c = document.getElementById('kUsers'); if (c) c.remove();
+  document.getElementById('bandeaux').innerHTML = '';
+}
+/* Bandeaux de l'administrateur : rien quand tout va bien ; rouge si l'arrêt d'urgence est actif ; orange si quelqu'un dépasse le seuil d'envois du jour */
+function majBandeaux(r) {
+  const z = document.getElementById('bandeaux');
+  z.innerHTML = '';
+  const ajouter = (cls, titre, detail) => {
+    const a = document.createElement('a');
+    a.href = 'utilisateurs.html'; a.className = cls;
+    a.textContent = titre;
+    if (detail) { const sm = document.createElement('small'); sm.textContent = detail; a.appendChild(sm); }
+    z.appendChild(a);
+  };
+  if (r.bloque) ajouter('rouge', '⛔ Envois bloqués (arrêt d\'urgence)', 'Activé par ' + (r.bloquePar || '?') + (r.bloqueLe ? ' le ' + r.bloqueLe : '') + ' · touche pour réactiver');
+  (r.alertes || []).forEach(x => ajouter('orange', '⚠ ' + x.nom + ' : ' + x.envois + ' envois aujourd\'hui', 'Plus de ' + r.seuil + ' envois dans la journée · touche pour gérer les utilisateurs'));
 }
 async function chargerUsers() {
   if (!peut('admin')) { retirerCarteUsers(); return; }
@@ -459,6 +481,7 @@ async function chargerUsers() {
   }
   try {
     const r = await Nova.api('usersResume', null, 10000);
+    majBandeaux(r);
     c.querySelector('b').textContent = r.actifs;
     const aide = c.querySelector('.aide');
     c.classList.toggle('alerte', r.nouveaux.length > 0);

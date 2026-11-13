@@ -242,7 +242,7 @@ async function enregistrer() {
   btn.disabled = false;
 }
 
-if (Nova.exiger('gestionnaire')) {
+if (Nova.exiger('gestion')) {
   document.getElementById('btnModifier').onclick = () => { edition = true; boutons(); dessiner(); };
   document.getElementById('btnAnnuler').onclick = () => { edition = false; edits = {}; boutons(); dessiner(); };
   document.getElementById('btnEnregistrer').onclick = enregistrer;
