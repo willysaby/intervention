@@ -31,6 +31,20 @@
   .mini span.off { background: var(--kobg); color: var(--koink); }
   .mini span.nv { background: var(--warnbg); color: var(--warnink); }
   .chev { color: var(--mute); font-size: 22px; }
+  .tableau { overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+  table.u { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table.u th { position: sticky; top: 0; background: var(--card); color: var(--mute); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.u td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; max-width: none; background: none; }
+  table.u tr.lg { cursor: pointer; }
+  table.u tr.lg:hover td { background: var(--pastille); }
+  table.u tr:last-child td { border-bottom: 0; }
+  table.u tr.alerte td { background: var(--warnbg); }
+  table.u tr.inactif td { opacity: .6; }
+  table.u .nomC { display: flex; align-items: center; gap: 10px; font-weight: 700; white-space: nowrap; }
+  table.u .nomC .ini { width: 34px; height: 34px; font-size: 13px; }
+  table.u td.act { text-align: right; width: 1%; white-space: nowrap; color: var(--lien); font-weight: 700; }
+  table.u .mini { margin: 0; }
+  @media (max-width: 700px) { table.u th.cApp, table.u td.cApp { display: none; } table.u th, table.u td { padding: 9px 8px; } table.u .nomC { white-space: normal; } table.u td.act { font-size: 0; padding-right: 6px; } table.u td.act::after { content: '›'; font-size: 24px; color: var(--mute); } }
   /* éditeur plein écran */
   #editeur { position: fixed; inset: 0; background: var(--bg, #fff); z-index: 50; overflow: auto; padding: 12px 16px 100px; }
   #editeur .cadre { max-width: 640px; margin: auto; }
@@ -82,7 +96,7 @@
     <input id="q" type="search" placeholder="Rechercher une personne" autocomplete="off">
     <button class="btn vert" type="button" id="btnNouveau">+ Nouvel utilisateur</button>
   </div>
-  <div class="liste" id="liste"></div>
+  <div class="tableau"><table class="u"><thead><tr><th>Personne</th><th>Droits</th><th class="cApp">Appareils</th><th>État</th><th></th></tr></thead><tbody id="liste"></tbody></table></div>
 </div>
 
 <div id="editeur" hidden>
@@ -152,19 +166,24 @@ function dessiner() {
     .sort((a, b) => (b.appareils.some(x => x.statut === 'Nouveau') - a.appareils.some(x => x.statut === 'Nouveau')) || (b.actif - a.actif) || a.nom.localeCompare(b.nom, 'fr'))
     .forEach(u => {
       const nv = u.appareils.some(a => a.statut === 'Nouveau');
-      const b = h('button', 'ligne' + (nv ? ' alerte' : '') + (u.actif ? '' : ' inactif')); b.type = 'button';
-      b.appendChild(h('div', 'ini', initiales(u.nom)));
-      const qui = h('div', 'qui'); qui.appendChild(h('b', null, u.nom));
-      const mini = h('div', 'mini');
-      if (!u.actif) mini.appendChild(h('span', 'off', 'Désactivé'));
-      if (nv) mini.appendChild(h('span', 'nv', '⚠ Nouvel appareil'));
+      const tr = h('tr', 'lg' + (nv ? ' alerte' : '') + (u.actif ? '' : ' inactif'));
+      const c1 = h('td'); const nc = h('div', 'nomC'); nc.appendChild(h('div', 'ini', initiales(u.nom))); nc.appendChild(h('span', null, u.nom)); c1.appendChild(nc); tr.appendChild(c1);
+      const c2 = h('td'); const mini = h('div', 'mini');
       if (u.droits.indexOf('admin') >= 0) mini.appendChild(h('span', 'adm', 'Administrateur'));
       else u.droits.forEach(d => mini.appendChild(h('span', null, COURT[d] || d)));
-      qui.appendChild(mini); b.appendChild(qui); b.appendChild(h('span', 'chev', '›'));
-      b.onclick = () => ouvrir(u);
-      zone.appendChild(b);
+      c2.appendChild(mini); tr.appendChild(c2);
+      const n = u.appareils.length;
+      tr.appendChild(h('td', 'cApp', n ? n + (n > 1 ? ' appareils' : ' appareil') : '—'));
+      const c4 = h('td'); const et = h('div', 'mini');
+      if (!u.actif) et.appendChild(h('span', 'off', 'Désactivé'));
+      else if (nv) et.appendChild(h('span', 'nv', '⚠ Nouvel appareil'));
+      else et.appendChild(h('span', null, 'Actif'));
+      c4.appendChild(et); tr.appendChild(c4);
+      tr.appendChild(h('td', 'act', 'Modifier ›'));
+      tr.onclick = () => ouvrir(u);
+      zone.appendChild(tr);
     });
-  if (!zone.children.length) zone.appendChild(h('div', 'info', 'Aucun utilisateur.'));
+  if (!zone.children.length) { const tr = h('tr'), td = h('td', null, 'Aucun utilisateur.'); td.colSpan = 5; tr.appendChild(td); zone.appendChild(tr); }
 }
 
 // ---- éditeur ----
