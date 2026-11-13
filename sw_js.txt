@@ -1,6 +1,6 @@
 // Service worker : copie locale d'abord (ouverture instantanée même avec un réseau très faible),
 // mise à jour en arrière-plan. Les nouvelles versions sont donc prises en compte à l'ouverture suivante.
-const CACHE = 'novafit-v41';
+const CACHE = 'novafit-v43';
 const FICHIERS = ['./', 'index.html', 'intervention.html', 'jonction.html', 'commandes.html', 'termines.html', 'nc.html', 'nc-ajout.html', 'achats.html', 'achat-nouveau.html', 'fournisseurs.html', 'utilisateurs.html',
   'commun.js', 'commun.css', 'theme.js', 'theme.css', 'shell.js', 'shell.css', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/';
