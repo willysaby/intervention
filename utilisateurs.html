@@ -229,7 +229,7 @@ function appareils() {
     d.appendChild(h('span', 'qui2', a.libelle + ' · ' + jolieDate(a.date) + (a.statut === 'Nouveau' ? ' · NOUVEAU' : '')));
     const act = (t, action) => { const bt = h('button', 'btnP', t); bt.type = 'button'; bt.style.padding = '8px 12px';
       bt.onclick = async () => { if (action === 'supprimer' && !confirm('Supprimer cet appareil de la liste ?')) return; bt.disabled = true;
-        try { await Nova.api('usersAppareil', { ligne: a.ligne, nom: a.nom, id: a.id, action: action }, 20000); const nom = courant.nom; await charger(); const u = donnees.users.find(x => x.nom === nom); if (u) ouvrir(u); }
+        try { await Nova.api('usersAppareil', { ligne: a.ligne, nom: a.nom, id: a.id, choix: action }, 20000); const nom = courant.nom; await charger(); const u = donnees.users.find(x => x.nom === nom); if (u) ouvrir(u); }
         catch (e) { bt.disabled = false; el('msgEd').className = 'ko'; el('msgEd').textContent = e.message; } };
       d.appendChild(bt); };
     if (a.statut === 'Nouveau') act('C\'est bon', 'valider');
