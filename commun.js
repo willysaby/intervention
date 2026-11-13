@@ -221,12 +221,14 @@
     for (let i = 0; i < lignes.length; i++) {
       const m = lignes[i].match(/Contact\s*:\s*(.*)$/i);
       if (m && !res.contact) {
-        res.contact = m[1].replace(/^(M\.|Mr|Mme|Mlle|Monsieur|Madame)\s+/i, '').replace(/\s+/g, ' ').trim();
+        res.contact = m[1].replace(/\s+/g, ' ').trim().replace(/^(Mme|Mlle|Mr|M|Monsieur|Madame)\s*\.?\s+/i, '').trim();
       }
       // Email : l'adresse peut etre sur la ligne suivante et coupee sur 2 ou 3 lignes
       const e = lignes[i].match(/E-?mail\s*:\s*(.*)$/i);
       if (e && !res.email) {
         let s = e[1].trim();
+        const colle = s.replace(/\s+/g, '');   // adresse coupee par des espaces (« nom @ site .com »)
+        if (/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(colle) && !interne(colle)) { res.email = colle.toLowerCase(); continue; }
         for (let k = 1; k <= 3 && i + k < lignes.length; k++) {
           const suite = lignes[i + k].trim();
           if (!suite || /\s/.test(suite) || (s && /\s/.test(s))) break;
@@ -237,7 +239,7 @@
       }
     }
     if (!res.email) {
-      const tous = (lignes.join('\n').match(new RegExp(RE.source, 'g')) || []).filter(function (x) { return !interne(x); });
+      const tous = (lignes.join('\n').replace(/\s*@\s*/g, '@').match(new RegExp(RE.source, 'g')) || []).filter(function (x) { return !interne(x); });
       res.email = (tous[0] || '').toLowerCase();
     }
     return res;
@@ -256,12 +258,18 @@
           const y = Math.round(it.transform[5]);
           let r = rangs.find(function (z) { return Math.abs(z.y - y) <= 2; });
           if (!r) { r = { y: y, items: [] }; rangs.push(r); }
-          r.items.push({ x: it.transform[4], s: it.str });
+          r.items.push({ x: it.transform[4], w: it.width || 0, s: it.str });
         });
         rangs.sort(function (a, b) { return b.y - a.y; });
         rangs.forEach(function (r) {
           r.items.sort(function (a, b) { return a.x - b.x; });
-          lignes.push(r.items.map(function (i) { return i.s; }).join(' '));
+          let t = '', fin = null;
+          r.items.forEach(function (i) {
+            if (fin !== null && i.x - fin > 1.2 && !/\s$/.test(t) && !/^\s/.test(i.s)) t += ' ';
+            t += i.s;
+            fin = i.x + i.w;
+          });
+          lignes.push(t);
         });
       }
       return contactDepuisLignes(lignes);
@@ -294,7 +302,7 @@
       const doc = o.donnees ? { donnees: o.donnees } : await api('document', { id: o.id }, 45000);
       if (moi !== jeton) return;
       const bytes = octets(doc.donnees);
-      if (o.surDocument) { try { o.surDocument(bytes); } catch (e) {} }
+      if (o.surDocument) { try { o.surDocument(bytes.slice(0)); } catch (e) {} }   // copie : l'affichage du PDF vide l'original
       if (urlBlob) URL.revokeObjectURL(urlBlob);
       urlBlob = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
       ouvrir.onclick = function () { window.open(urlBlob, '_blank'); };

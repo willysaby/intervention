@@ -99,7 +99,7 @@ function ouvrir(c) {
     surDocument: bytes => { lecture = Nova.extraireContact(bytes); },
     action: { texte: 'Faire le bon d\'intervention', fn: async () => {
       let x = {};
-      try { if (lecture) x = await Promise.race([lecture, new Promise(r => setTimeout(() => r({}), 3000))]) || {}; } catch (e) {}
+      try { if (lecture) x = await Promise.race([lecture, new Promise(r => setTimeout(() => r({}), 8000))]) || {}; } catch (e) {}
       location.href = url + (x.contact ? '&contact=' + encodeURIComponent(x.contact) : '') + (x.email ? '&email=' + encodeURIComponent(x.email) : '');
     } }
   });
