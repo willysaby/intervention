@@ -1,6 +1,6 @@
 // Service worker : copie locale d'abord (ouverture instantanée même avec un réseau très faible),
 // mise à jour en arrière-plan. Les nouvelles versions sont donc prises en compte à l'ouverture suivante.
-const CACHE = 'novafit-v49';
+const CACHE = 'novafit-v50';
 const FICHIERS = ['./', 'index.html', 'intervention.html', 'jonction.html', 'commandes.html', 'termines.html', 'nc.html', 'nc-ajout.html', 'achats.html', 'achat-nouveau.html', 'fournisseurs.html', 'utilisateurs.html', 'distance.html', 'signer.html', 'maintenance.html',
   'commun.js', 'commun.css', 'theme.js', 'theme.css', 'shell.js', 'shell.css', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/';
@@ -24,11 +24,14 @@ self.addEventListener('activate', e => {
 
 // Renvoie la copie locale tout de suite si elle existe ; sinon attend le réseau (8 s maximum).
 // Dans tous les cas, la copie est rafraîchie en arrière-plan quand le réseau répond.
+function cleSansParametres(req) { const u = new URL(req.url); u.search = ''; return u.href; }
+
 function copieLocaleOuReseau(e, req, ignoreSearch) {
   const maj = fetch(req, { cache: 'no-cache' }).then(rep => {
     if (rep && (rep.ok || rep.type === 'opaque')) {
       const copie = rep.clone();
-      caches.open(CACHE).then(c => c.put(req, copie));
+      // Même page avec un autre « ?t=... » : on garde UNE seule copie (adresse sans paramètres), sinon l'ancienne copie resterait servie
+      caches.open(CACHE).then(c => c.put(ignoreSearch ? cleSansParametres(req) : req, copie));
     }
     return rep;
   });
