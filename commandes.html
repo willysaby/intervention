@@ -40,6 +40,8 @@
 <script src="commun.js"></script>
 <script>
 const CLE_CACHE = 'commandesCache';
+const DISTANCE = new URLSearchParams(location.search).get('mode') === 'distance';   // bon a signer a distance (le client signe en ligne)
+const MODE_URL = DISTANCE ? 'mode=distance' : '';
 let commandes = [];
 // Si le script n'est pas à jour, le client est repris du nom du fichier (« CD26xxxx - Client »)
 function corrigerClient(c) {
@@ -51,8 +53,10 @@ function corrigerClient(c) {
 
 function enAttente() {
   // Commandes dont le bon est gardé sur l'appareil en attendant le réseau
-  try { return (JSON.parse(localStorage.getItem('bonsEnAttente')) || []).map(b => b.donnees && b.donnees.docId).filter(Boolean); }
-  catch (e) { return []; }
+  let l = [];
+  try { l = (JSON.parse(localStorage.getItem('bonsEnAttente')) || []).map(b => b.donnees && b.donnees.docId).filter(Boolean); } catch (e) {}
+  try { l = l.concat(Nova.lireFile().filter(x => x.action === 'distanceCreer').map(x => x.donnees && x.donnees.docId).filter(Boolean)); } catch (e) {}
+  return l;
 }
 
 function dessiner(horsLigne) {
@@ -92,13 +96,13 @@ function dessiner(horsLigne) {
 }
 
 function ouvrir(c) {
-  const url = 'intervention.html?doc=' + encodeURIComponent(c.id) + '&cd=' + encodeURIComponent(c.cd) + '&client=' + encodeURIComponent(c.client);
+  const url = 'intervention.html?doc=' + encodeURIComponent(c.id) + '&cd=' + encodeURIComponent(c.cd) + '&client=' + encodeURIComponent(c.client) + (MODE_URL ? '&' + MODE_URL : '');
   let lecture = null;   // contact + email lus dans le PDF (sans IA)
   Nova.ouvrirVisio({
     id: c.id,
     titre: (c.cd ? c.cd : '') + (c.client ? ' · ' + c.client : ''),
     surDocument: bytes => { lecture = Nova.extraireContact(bytes); },
-    action: { texte: 'Faire le bon d\'intervention', fn: async () => {
+    action: { texte: DISTANCE ? 'Préparer le bon à signer' : 'Faire le bon d\'intervention', fn: async () => {
       let x = {};
       try { if (lecture) x = await Promise.race([lecture, new Promise(r => setTimeout(() => r({}), 8000))]) || {}; } catch (e) {}
       location.href = url + (x.contact ? '&contact=' + encodeURIComponent(x.contact) : '') + (x.email ? '&email=' + encodeURIComponent(x.email) : '');
@@ -133,7 +137,14 @@ async function charger() {
   }
 }
 
-if (Nova.exiger('intervention')) {
+if (Nova.exiger(DISTANCE ? 'distance' : 'intervention')) {
+  if (DISTANCE) {
+    document.title = 'Bon à signer à distance';
+    document.querySelector('.haut h1').textContent = 'Bon à signer à distance';
+    const ret = document.querySelector('.haut a'); ret.href = 'distance.html'; ret.textContent = '← Bons à signer';
+    document.getElementById('btnVierge').href = 'intervention.html?mode=distance';
+    document.getElementById('sepCmd').textContent = 'ou choisir la commande en cours du client';
+  }
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('icVierge').innerHTML = Shell.svg('plus', 32);
     document.getElementById('flVierge').innerHTML = Shell.svg('chevron', 24);

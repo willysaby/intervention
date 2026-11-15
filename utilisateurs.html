@@ -146,9 +146,10 @@ const LIB = {
   achats: ['Achats', 'Commandes fournisseurs (consommables)'],
   gestion: ['Gestion', 'Interventions terminées et suivi'],
   fournisseurs: ['Fournisseurs', 'Annuaire des fournisseurs'],
+  distance: ['Bon à signer à distance', 'Envoyer un bon au client pour qu\'il le signe en ligne'],
   admin: ['Administrateur', 'Tous les droits + gestion des utilisateurs']
 };
-const COURT = { jonction: 'Jonction', intervention: 'Intervention', nc: 'NC', achats: 'Achats', gestion: 'Gestion', fournisseurs: 'Fournisseurs', admin: 'Administrateur' };
+const COURT = { jonction: 'Jonction', intervention: 'Intervention', nc: 'NC', achats: 'Achats', gestion: 'Gestion', fournisseurs: 'Fournisseurs', distance: 'Signature à distance', admin: 'Administrateur' };
 const PRESETS = [['Technicien', ['jonction', 'intervention']], ['Gestionnaire', ['jonction', 'intervention', 'nc', 'achats', 'gestion', 'fournisseurs']], ['Administrateur', ['admin']]];
 let DROITS = [], donnees = null, courant = null, droitsEd = [], modifie = false, codeVisible = false;
 const el = id => document.getElementById(id);
@@ -306,7 +307,7 @@ async function changerStop(bloquer, bouton) {
 }
 async function charger() {
   try { donnees = await Nova.api('usersListe', null, 20000); } catch (e) { el('erreur').textContent = e.message; el('erreur').hidden = false; return; }
-  DROITS = donnees.droits; el('erreur').hidden = true; dessiner(); dessinerStop();
+  DROITS = donnees.droits.filter(x => x !== 'admin').concat(donnees.droits.indexOf('admin') >= 0 ? ['admin'] : []); el('erreur').hidden = true; dessiner(); dessinerStop();
 }
 // bouton « Terminer » après création : on remet l'éditeur à l'état normal
 const ferme0 = el('edFermer').onclick;

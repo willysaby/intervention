@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Bons à signer</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="commun.css">
+<style>
+  .page { max-width: 760px; }
+  a.gros { display: flex; align-items: center; gap: 16px; background: var(--vert); color: #fff; border-radius: 22px; padding: 20px; text-decoration: none; box-shadow: 0 6px 18px rgba(14,144,98,.25); margin: 4px 0 8px; }
+  a.gros .pic { flex: none; width: 56px; height: 56px; border-radius: 16px; background: rgba(255,255,255,.18); display: grid; place-items: center; }
+  a.gros .tx b { display: block; font-size: 22px; } a.gros .tx span { display: block; font-size: 14px; opacity: .9; margin-top: 3px; }
+  a.gros .fl { margin-left: auto; opacity: .85; display: flex; }
+  .sep { display: flex; align-items: center; gap: 10px; color: var(--mute); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; margin: 20px 0 10px; }
+  .sep::before, .sep::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .bon { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+  .bon.attente { background: var(--warnbg); color: var(--warnink); border: 2px solid #e0b100; }
+  .bon.relance { background: var(--kobg); color: var(--koink); border: 2px solid var(--koink); }
+  .bon .l1 { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .bon .l1 b { font-size: 18px; }
+  .bon .num { font-weight: 700; font-size: 14px; }
+  .bon small { display: block; margin-top: 4px; font-size: 13px; opacity: .85; }
+  .puce { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 800; background: var(--pastille); color: var(--mute); }
+  .puce.attente { background: var(--warnink); color: var(--warnbg); }
+  .puce.relance { background: var(--koink); color: var(--kobg); }
+  .puce.signe { background: var(--okbg); color: var(--okink); }
+  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .actions .btn { flex: 1; min-width: 140px; }
+  .actions .btn.danger { color: var(--koink); }
+  #msg { text-align: center; font-weight: 600; margin: 8px 0; min-height: 1.2em; }
+  #msg.ok { color: var(--okink); } #msg.ko { color: var(--koink); }
+  .vide { color: var(--mute); text-align: center; padding: 18px; }
+  .aEnvoyer { background: var(--warnbg); color: var(--warnink); border: 2px solid #e0b100; border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; display: grid; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <div class="haut"><a href="./">← Accueil</a><h1>Bons à signer</h1><button class="btn" id="btnActualiser" type="button">Actualiser</button></div>
+  <a class="gros" href="commandes.html?mode=distance"><div class="pic" id="icNouveau"></div><div class="tx"><b>Nouveau bon à signer</b><span>Je prépare le bon, le client le signe en ligne</span></div><span class="fl" id="flNouveau"></span></a>
+  <div id="msg"></div>
+  <div id="aEnvoyer"></div>
+  <div class="sep" id="sepAtt" hidden>En attente de signature</div>
+  <div id="attente"></div>
+  <div class="sep" id="sepSigne" hidden>Signés et annulés</div>
+  <div id="signes"></div>
+  <div id="infos"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script>
+const el = id => document.getElementById(id);
+function h(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+function msg(t, ok) { const m = el('msg'); m.textContent = t || ''; m.className = t ? (ok ? 'ok' : 'ko') : ''; }
+const URL_SIGNER = new URL('signer.html', location.href).href;
+let occupe = false;
+
+/* ---------- Bons préparés mais pas encore partis (gardés sur l'appareil) ---------- */
+function dessinerFile() {
+  const z = el('aEnvoyer');
+  z.innerHTML = '';
+  const l = Nova.lireFile().filter(x => x.action === 'distanceCreer');
+  if (!l.length) return;
+  const b = h('div', 'aEnvoyer');
+  b.appendChild(h('b', null, l.length + (l.length > 1 ? ' bons préparés, pas encore envoyés' : ' bon préparé, pas encore envoyé')));
+  l.forEach(x => { const d = h('div', null, '• ' + (x.donnees && x.donnees.client || x.libelle) + (x.erreur ? ' : refusé (' + x.erreur + ')' : '')); b.appendChild(d); });
+  const btn = h('button', 'btn vert', 'Envoyer les liens maintenant');
+  btn.type = 'button';
+  btn.onclick = async () => {
+    btn.disabled = true; msg('Envoi en cours...', true);
+    try { const r = await Nova.viderFile(); msg(r.envoyes ? r.envoyes + ' lien(s) envoyé(s).' : (r.erreurs ? 'Refusé : voir le message sous le bon.' : 'Rien n\'a pu partir (réseau ?).'), !!r.envoyes); }
+    catch (e) { msg(e.message, false); }
+    charger();
+  };
+  b.appendChild(btn);
+  z.appendChild(b);
+}
+
+/* ---------- Liste ---------- */
+function ligneBon(b) {
+  const c = h('div', 'bon' + (b.etat === 'attente' ? (b.relance ? ' relance' : ' attente') : b.etat === 'expire' ? ' relance' : ''));
+  const l1 = h('div', 'l1');
+  l1.appendChild(h('b', null, b.client));
+  l1.appendChild(h('span', 'num', b.numero));
+  c.appendChild(l1);
+  const pu = h('span', 'puce ' + (b.etat === 'attente' ? (b.relance ? 'relance' : 'attente') : b.etat === 'expire' ? 'relance' : b.etat === 'signe' ? 'signe' : ''));
+  pu.textContent = b.etat === 'signe' ? 'Signé' : b.etat === 'annule' ? 'Annulé' : b.etat === 'expire' ? 'Lien expiré' :
+    (!b.lienParti ? 'Lien non envoyé' : b.relance ? 'À relancer · ' + b.jours + ' j sans réponse' : b.jours ? 'En attente · ' + b.jours + ' j' : 'En attente · envoyé aujourd\'hui');
+  const p = h('div'); p.style.marginTop = '6px'; p.appendChild(pu); c.appendChild(p);
+  let d = '';
+  if (b.etat === 'signe') d = 'Signé le ' + b.signeLe;
+  else if (b.lienParti) d = 'Lien envoyé le ' + b.envoyeLe + ' · valable jusqu\'au ' + b.expireLe;
+  if (b.emails) d += (d ? ' · ' : '') + b.emails;
+  if (b.creePar) d += (d ? ' · ' : '') + 'par ' + b.creePar;
+  if (d) c.appendChild(h('small', null, d));
+  if (b.etat === 'attente' || b.etat === 'expire') {
+    const a = h('div', 'actions');
+    const r = h('button', 'btn vert', b.lienParti ? 'Renvoyer le lien' : 'Envoyer le lien'); r.type = 'button';
+    r.onclick = () => renvoyer(b, r);
+    a.appendChild(r);
+    const x = h('button', 'btn danger', 'Annuler ce bon'); x.type = 'button';
+    let sur = false;
+    x.onclick = () => {
+      if (!sur) { sur = true; x.textContent = 'Confirmer l\'annulation'; setTimeout(() => { sur = false; x.textContent = 'Annuler ce bon'; }, 5000); return; }
+      annuler(b, x);
+    };
+    a.appendChild(x);
+    c.appendChild(a);
+  }
+  return c;
+}
+
+async function renvoyer(b, btn) {
+  if (occupe) return; occupe = true; btn.disabled = true; msg('Envoi du lien...', true);
+  try { await Nova.api('distanceRenvoyer', { numero: b.numero, urlSigner: URL_SIGNER }, 30000); msg('Lien renvoyé à ' + b.client + ' (valable 7 jours de plus).', true); }
+  catch (e) { msg(e.message, false); }
+  occupe = false; charger();
+}
+async function annuler(b, btn) {
+  if (occupe) return; occupe = true; btn.disabled = true;
+  try { await Nova.api('distanceAnnuler', { numero: b.numero }, 30000); msg('Bon ' + b.numero + ' annulé (le numéro reste attribué).', true); }
+  catch (e) { msg(e.message, false); }
+  occupe = false; charger();
+}
+
+async function charger() {
+  dessinerFile();
+  el('infos').textContent = 'Chargement...';
+  try {
+    const r = await Nova.api('distanceListe', null, 15000);
+    el('infos').textContent = '';
+    const att = r.bons.filter(b => b.etat === 'attente' || b.etat === 'expire');
+    const fin = r.bons.filter(b => b.etat === 'signe' || b.etat === 'annule');
+    el('attente').innerHTML = ''; el('signes').innerHTML = '';
+    att.forEach(b => el('attente').appendChild(ligneBon(b)));
+    fin.forEach(b => el('signes').appendChild(ligneBon(b)));
+    el('sepAtt').hidden = !att.length; el('sepSigne').hidden = !fin.length;
+    if (!r.bons.length) el('infos').textContent = 'Aucun bon à signer pour le moment.';
+    try { localStorage.setItem('distanceResume', JSON.stringify({ attente: att.length, relance: att.filter(b => b.etat === 'expire' || b.relance).length })); } catch (e) {}
+  } catch (e) {
+    el('infos').textContent = '';
+    msg(e.code === 'reseau' ? 'Pas de réseau : la liste s\'affichera quand la connexion reviendra.' : e.message, false);
+  }
+}
+
+if (Nova.exiger('distance')) {
+  document.addEventListener('DOMContentLoaded', () => {
+    el('icNouveau').innerHTML = Shell.svg('pen', 32);
+    el('flNouveau').innerHTML = Shell.svg('chevron', 24);
+  });
+  el('btnActualiser').onclick = charger;
+  document.addEventListener('nova:file', dessinerFile);
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  charger();
+}
+</script>
+<script src="shell.js"></script>
+</body>
+</html>

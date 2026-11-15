@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Bon d'intervention à signer</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="icon" href="icon-192.png">
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, Arial, sans-serif; background: var(--bg); color: var(--ink); padding: 12px; }
+  .page { max-width: 720px; margin: 0 auto; }
+  .marque { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; }
+  .marque img { width: 44px; height: 44px; border-radius: 12px; background: #fff; }
+  .marque b { font-size: 20px; display: block; } .marque span { color: var(--mute); font-size: 14px; }
+  .carte { background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 4px var(--ombre); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .numero { color: var(--lien); font-weight: 700; font-size: 18px; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 14px 0 0; font-size: 15px; }
+  dt { color: var(--mute); } dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 7px 8px; text-align: center; }
+  th { background: var(--pastille); }
+  h2 { font-size: 16px; margin: 0 0 8px; }
+  .com { white-space: pre-wrap; border: 1px solid var(--line); border-radius: 10px; padding: 10px; min-height: 48px; }
+  .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .photos img { width: 100%; border-radius: 10px; display: block; }
+  label { display: block; font-weight: 700; margin: 12px 0 6px; font-size: 14px; }
+  input[type=text] { width: 100%; padding: 12px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
+  canvas { width: 100%; height: 190px; border: 1px solid var(--line); border-radius: 10px; touch-action: none; background: #fff; display: block; }
+  .eff { margin-top: 8px; background: none; border: 1px solid var(--line); color: var(--ink); border-radius: 10px; padding: 8px 14px; font-size: 14px; font-family: inherit; }
+  .valider { width: 100%; margin-top: 16px; padding: 16px; font-size: 18px; font-weight: 800; border: 0; border-radius: 14px; background: var(--vert); color: #fff; font-family: inherit; }
+  .valider:disabled { opacity: .55; }
+  .aide { font-size: 13px; color: var(--mute); margin-top: 8px; }
+  #retour { font-weight: 600; text-align: center; margin: 12px 0; min-height: 1.2em; color: var(--koink); }
+  .etat { text-align: center; padding: 28px 16px; font-size: 17px; }
+  .etat.ok { background: var(--okbg); color: var(--okink); }
+  .etat.ko { background: var(--kobg); color: var(--koink); }
+  .etat b { display: block; font-size: 22px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="marque"><img src="icon-192.png" alt=""><div><b>Novafit</b><span>Bon d'intervention à signer</span></div></div>
+
+  <div id="chargement" class="carte etat">Chargement du bon...</div>
+  <div id="erreur" class="carte etat ko" hidden></div>
+  <div id="merci" class="carte etat ok" hidden></div>
+
+  <div id="bon" hidden>
+    <div class="carte">
+      <h1>Bon d'intervention</h1>
+      <div class="numero" id="numero"></div>
+      <dl>
+        <dt>Client</dt><dd id="client"></dd>
+        <dt>Date</dt><dd id="date"></dd>
+        <dt>Technicien(s)</dt><dd id="technicien"></dd>
+        <dt>Horaires</dt><dd id="horaires"></dd>
+        <dt id="dtCmd">N° de commande</dt><dd id="numeroCommande"></dd>
+      </dl>
+    </div>
+    <div class="carte">
+      <h2>Bandes</h2>
+      <table><thead><tr><th>Bande</th><th>Matière</th><th>Largeur</th><th>Longueur</th><th id="thCom">Commentaire</th></tr></thead><tbody id="bandes"></tbody></table>
+    </div>
+    <div class="carte"><h2>Commentaire</h2><div class="com" id="commentaire"></div></div>
+    <div class="carte" id="cartePhotos" hidden><h2>Photos de l'intervention</h2><div class="photos" id="photos"></div></div>
+
+    <div class="carte">
+      <h2>Signature du client</h2>
+      <label for="nom">Nom et prénom de la personne qui signe</label>
+      <input type="text" id="nom" autocomplete="name" placeholder="Nom et prénom">
+      <label>Signature (avec le doigt ou la souris)</label>
+      <canvas id="sign"></canvas>
+      <button class="eff" type="button" onclick="effacer()">Effacer la signature</button>
+      <div class="aide">En signant, vous confirmez que l'intervention décrite ci-dessus a bien été réalisée. Vous recevrez le bon signé par email.</div>
+      <button class="valider" id="btnValider" type="button" onclick="valider()">Valider et signer</button>
+      <div id="retour"></div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+const URL_API = (window.CONFIG && window.CONFIG.URL_API) || '';
+const T = new URLSearchParams(location.search).get('t') || '';
+const el = id => document.getElementById(id);
+const canvas = el('sign'), ctx = canvas.getContext('2d');
+let dessine = false, aSigne = false;
+
+function montrer(id, texte, titre) {
+  ['chargement', 'erreur', 'merci', 'bon'].forEach(x => { el(x).hidden = x !== id; });
+  if (texte !== undefined) { el(id).innerHTML = ''; if (titre) { const b = document.createElement('b'); b.textContent = titre; el(id).appendChild(b); } el(id).appendChild(document.createTextNode(texte)); }
+}
+
+async function appeler(donnees, delai) {
+  const ctrl = new AbortController();
+  const m = setTimeout(() => ctrl.abort(), delai || 30000);
+  let r, res;
+  try { r = await fetch(URL_API, { method: 'POST', body: JSON.stringify(donnees), signal: ctrl.signal }); res = await r.json(); }
+  catch (e) { clearTimeout(m); const x = new Error('La connexion a échoué. Vérifiez votre réseau puis réessayez.'); x.code = 'reseau'; throw x; }
+  clearTimeout(m);
+  if (!res.ok) { const x = new Error(res.erreur || 'Erreur.'); x.code = res.code || ''; throw x; }
+  return res;
+}
+
+function ligne(tr, valeurs) { valeurs.forEach(v => { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }); }
+
+async function charger() {
+  if (!URL_API || T.length < 20) { montrer('erreur', 'Ce lien n\'est pas valide. Vérifiez que vous avez copié le lien en entier depuis l\'email.', 'Lien invalide'); return; }
+  montrer('chargement');
+  try {
+    const b = await appeler({ action: 'signLire', t: T }, 45000);
+    el('numero').textContent = 'N° ' + b.numero;
+    el('client').textContent = b.client;
+    el('date').textContent = b.date;
+    el('technicien').textContent = b.technicien;
+    el('horaires').textContent = b.heureArrivee + ' - ' + b.heureFin;
+    el('numeroCommande').textContent = b.numeroCommande || '';
+    el('dtCmd').hidden = el('numeroCommande').hidden = !b.numeroCommande;
+    const avecCom = b.bandes.some(x => String(x.commentaire || '').trim());
+    el('thCom').hidden = !avecCom;
+    b.bandes.forEach((x, i) => { const tr = document.createElement('tr'); ligne(tr, [i + 1, x.matiere, x.largeur, x.longueur].concat(avecCom ? [x.commentaire || ''] : [])); el('bandes').appendChild(tr); });
+    el('commentaire').textContent = b.commentaire || '';
+    (b.photos || []).forEach(p => { const i = document.createElement('img'); i.src = p; i.alt = 'Photo de l\'intervention'; el('photos').appendChild(i); });
+    el('cartePhotos').hidden = !(b.photos && b.photos.length);
+    el('nom').value = b.nomSignataire || '';
+    montrer('bon');
+    ajuster();
+  } catch (e) {
+    montrer('erreur', e.message, e.code === 'signe' ? 'Bon déjà signé' : e.code === 'expire' ? 'Lien expiré' : e.code === 'annule' ? 'Bon annulé' : 'Impossible d\'ouvrir le bon');
+  }
+}
+
+/* ---------- Signature ---------- */
+function ajuster() {
+  const r = canvas.getBoundingClientRect();
+  if (!r.width) return;
+  canvas.width = r.width * 2; canvas.height = r.height * 2;
+  ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#000';
+  aSigne = false;
+}
+function pos(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height }; }
+canvas.addEventListener('pointerdown', e => { e.preventDefault(); canvas.setPointerCapture(e.pointerId); dessine = true; aSigne = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + 0.1, p.y + 0.1); ctx.stroke(); });
+canvas.addEventListener('pointermove', e => { if (!dessine) return; e.preventDefault(); const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(n => canvas.addEventListener(n, () => { dessine = false; }));
+function effacer() { ctx.clearRect(0, 0, canvas.width, canvas.height); aSigne = false; }
+window.addEventListener('resize', () => { if (!aSigne) ajuster(); });
+
+async function valider() {
+  const retour = el('retour'), btn = el('btnValider');
+  const nom = el('nom').value.trim();
+  if (nom.length < 2) { retour.textContent = 'Indiquez votre nom et prénom.'; return; }
+  if (!aSigne) { retour.textContent = 'Merci de signer dans le cadre.'; return; }
+  btn.disabled = true; retour.style.color = 'var(--mute)'; retour.textContent = 'Envoi de votre signature...';
+  try {
+    const r = await appeler({ action: 'signValider', t: T, nom: nom, signature: canvas.toDataURL('image/png') }, 90000);
+    montrer('merci', 'Le bon ' + r.numero + ' est signé. Vous allez le recevoir par email dans quelques instants. Vous pouvez fermer cette page.', 'Merci !');
+  } catch (e) {
+    if (e.code === 'signe') { montrer('merci', 'Ce bon a déjà été signé. Vous l\'avez reçu par email.', 'Bon déjà signé'); return; }
+    if (e.code === 'expire' || e.code === 'annule' || e.code === 'invalide') { montrer('erreur', e.message, e.code === 'expire' ? 'Lien expiré' : 'Bon indisponible'); return; }
+    retour.style.color = 'var(--koink)';
+    retour.textContent = e.message;
+    btn.disabled = false;
+  }
+}
+
+charger();
+</script>
+</body>
+</html>

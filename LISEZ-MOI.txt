@@ -1,0 +1,70 @@
+ARCHIVE A JOUR - 15/11/2026   (script 2026-11-15-b, cache du site novafit-v44)
+===============================================================================
+
+SOMMAIRE DE L'ARCHIVE
+  1_GitHub      tous les fichiers du site (pages .html, commun.js, shell.js, sw.js, theme, manifest, icones).
+                sw_js.txt = copie de sw.js a renommer si ton systeme bloque les .js.
+  2_AppsScript  Code.gs = script des bons d'intervention (Apps Script du Sheet « bon d intervention »).
+                Code_gs.txt = copie a renommer. patch-jonction.txt = ancien patch du script Jonction (deja applique, inutile).
+  3_Apercus     captures d'ecran.
+  4_Import      Import_fournisseurs.xlsx (annuaire fournisseurs).
+  PROCEDURE.txt mise en service, comptes, protections, numerotation, mode hors ligne (a lire avant de deployer).
+  robots_a_ajouter_a_la_racine_du_site.txt  optionnel (voir « Site de l'entreprise »).
+
+CE QUE FAIT L'APPLICATION
+  Accueil : boutons Jonction et Intervention (jaune si des bons attendent d'etre envoyes), Non-conformites, Achats, Fournisseurs,
+            Interventions finies, Utilisateurs (administrateur).
+  Bons d'intervention : bon de commande (PDF lu pour prerenseigner contact et email) et bon vierge, photos, envoi par mail, hors ligne.
+  Achats : commandes fournisseurs avec apercu PDF avant envoi, liste, suivi « recue ».
+  Non-conformites, annuaire fournisseurs par tags, Jonction (parametres de presse).
+  Bon a signer a distance : le client recoit un lien, voit le bon et le signe en ligne (pages distance.html et signer.html). Voir PROCEDURE.txt.
+  Utilisateurs : tableau des comptes, droits un par un, codes personnels, suivi des appareils (« C'est bon »), arret d'urgence des envois.
+
+REGLES IMPORTANTES
+  Droits : jonction, intervention, nc, achats, gestion (Interventions finies), fournisseurs, distance (bon a signer a distance), admin.
+  Numerotation des bons ET des commandes fournisseurs : numero pris au clic sur « Envoyer », conserve meme si le mail echoue,
+  jamais a l'ouverture ni a l'apercu. Voir PROCEDURE.txt.
+  Protections d'envoi (haut de Code.gs) : 25 mails/jour, 2/heure/personne, alerte orange au-dela de 5/jour, bouton rouge d'arret.
+  Reglages « A PERSONNALISER » en haut de Code.gs : EMAIL_ENTREPRISE = technique@novafit.fr (recoller un Code.gs complet l'ecrase).
+  LOGIN_ANCIEN (ligne 43 de Code.gs) = true tant que tout le monde n'a pas son code personnel, puis false.
+  Jonction avec comptes personnels : proprietes du script JONCTION_CODE_ACCES et JONCTION_CODE_ADMIN (script des bons).
+
+SITE DE L'ENTREPRISE
+  Copier tout 1_GitHub dans le sous-dossier /intervention/ (nom attendu par manifest.webmanifest). Rien a la racine du site.
+  Toutes les pages portent une balise noindex (pas de referencement). Meme jeu de fichiers sur GitHub et sur le site.
+  Apres un changement de site : chacun se reconnecte une fois ; valider les appareils (« C'est bon »).
+
+DEPLOYER A CHAQUE MISE A JOUR
+  1. Code.gs : coller dans Apps Script, enregistrer, Deployer > Gerer les deployements > crayon > Nouvelle version.
+     Verifier la version sur l'adresse /exec.
+  2. Fichiers du site : remplacer sur GitHub (et sur le site), dont sw.js (numero de cache a jour). Recharger deux fois.
+
+NOUVEAU DU 15/11/2026
+  - Bon a signer a distance (droit « distance », bouton jaune a l'accueil, numero reserve a l'envoi du lien, lien valable 7 jours, rappel apres 2 jours).
+
+HISTORIQUE DU 13/11/2026
+  - Accueil boutons double largeur ; bon vierge ; vignettes photo ; lecture PDF contact/email renforcee (cas Gerflor).
+  - Protections d'envoi, arret d'urgence, numerotation au clic (bons), controle de la numerotation des commandes fournisseurs.
+  - Page Utilisateurs en tableau ; correctif « C'est bon / Supprimer » d'un appareil (champ choix).
+  - Correctif Interventions finies (droit gestion) ; correctif Jonction (compte administrateur personnel).
+  - Page Achats : les lignes partiellement remplies restent visibles.
+  - noindex sur toutes les pages.
+
+HISTORIQUE ANTERIEUR (12/11/2026 et avant)
+ARCHIVE COMPLETE - 12/11/2026
+Contient : bons, Jonction, NC, Achats (avec aperçu avant envoi), comptes personnels avec droits et suivi des appareils,
+voyant Utilisateurs, annuaire des fournisseurs par tags.
+1_GitHub : tous les fichiers du site. NOUVEAUX : fournisseurs.html, utilisateurs.html. MODIFIES : index.html, commun.js, shell.js, sw.js,
+           achat-nouveau.html, achats.html, nc.html, nc-ajout.html, commandes.html.
+2_AppsScript : Code.gs (Apps Script du Sheet Bons) + patch-jonction.txt (déjà appliqué, inchangé)
+3_Apercus : captures
+PROCEDURE.txt : lire la section « MISE EN SERVICE DES COMPTES » avant de déployer.
+Commandes en cours : à l'ouverture du bon d'intervention, le « Nom du signataire » et l'email du client sont préremplis depuis le PDF
+(lecture du texte, sans IA ; modifiables). Le nom du client reste celui de la liste. Nouveauté sw.js : novafit-v22.
+ANNUAIRE FOURNISSEURS : nouvelle version (fiches + tableau, tags, édition). 4_Import/Import_fournisseurs.xlsx = tes 108 fournisseurs à coller
+dans le Sheet annuaire (voir PROCEDURE.txt). Le logo Novafit en haut ramène à l'accueil.
+Menu du bas (gestionnaire/administrateur) : 5 boutons Jonction / Intervention / Accueil / Achats / NC. L'annuaire fournisseurs
+s'ouvre depuis le gros bouton de l'accueil (pas dans le menu).
+Nom de la personne : affiché sur l'accueil, écrit dans « Saisi par » (achats, NC), technicien pré-coché dans le bon.
+
+HORS LIGNE : voir PROCEDURE.txt (section MODE HORS LIGNE). sw.js = novafit-v23.

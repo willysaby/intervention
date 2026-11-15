@@ -20,6 +20,7 @@
     camera: '<path d="M4 8h3l1.6-2.2A1 1 0 0 1 9.4 5.4h5.2a1 1 0 0 1 .8.4L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
     image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 9"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    pen: '<path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19l-4 1z"/><path d="M14 7l3 3"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
   };
   function svg(nom, taille) {
@@ -38,14 +39,14 @@
   }
   const ONGLETS = [
     { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', droit: 'jonction', fichiers: ['jonction.html'] },
-    { id: 'inter', lib: 'Intervention', href: 'commandes.html', ic: 'wrench', droit: 'intervention', fichiers: ['commandes.html', 'intervention.html'] },
+    { id: 'inter', lib: 'Intervention', href: 'commandes.html', ic: 'wrench', droit: 'intervention', fichiers: ['commandes.html', 'intervention.html', 'distance.html'] },
     { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', droit: null, fichiers: ['', 'index.html'] },
     { id: 'finies', lib: 'Finies', href: 'termines.html', ic: 'check', droit: 'gestion', fichiers: ['termines.html'] }
   ];
   // Menu des gestionnaires et administrateurs : seuls les onglets auxquels le compte a droit apparaissent
   const ONGLETS_GEST = [
     { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', droit: 'jonction', fichiers: ['jonction.html'] },
-    { id: 'inter', lib: 'Intervention', href: 'commandes.html', ic: 'wrench', droit: ['intervention', 'gestion'], fichiers: ['commandes.html', 'intervention.html', 'termines.html'] },
+    { id: 'inter', lib: 'Intervention', href: 'commandes.html', ic: 'wrench', droit: ['intervention', 'gestion'], fichiers: ['commandes.html', 'intervention.html', 'termines.html', 'distance.html'] },
     { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', droit: null, fichiers: ['', 'index.html', 'utilisateurs.html', 'fournisseurs.html'] },
     { id: 'achats', lib: 'Achats', href: 'achats.html', ic: 'cart', droit: 'achats', fichiers: ['achats.html', 'achat-nouveau.html'] },
     { id: 'nc', lib: 'NC', href: 'nc.html', ic: 'alert', droit: 'nc', fichiers: ['nc.html', 'nc-ajout.html'] }

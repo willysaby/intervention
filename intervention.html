@@ -74,6 +74,7 @@
   <button id="btnRenvoi" onclick="envoyerEnAttente(true)">Renvoyer les bons en attente</button>
 </div>
 <div id="infoHaut"></div>
+<div id="bandeauDistance" class="carte" hidden></div>
 
 <div class="carte">
   <div class="entete">
@@ -117,11 +118,13 @@
 </div>
 
 <div class="carte">
-  <label>Nom du signataire</label><input id="nomSignataire" placeholder="Nom et prénom de la personne qui signe">
+  <label id="labNom">Nom du signataire</label><input id="nomSignataire" placeholder="Nom et prénom de la personne qui signe">
+  <div id="zoneSignature">
   <label>Signature du client</label>
   <canvas id="sign"></canvas>
   <button class="eff" onclick="effacerSignature()">Effacer la signature</button>
-  <label>Email du client (pour recevoir le bon)</label>
+  </div>
+  <label id="labEmail">Email du client (pour recevoir le bon)</label>
   <input type="text" inputmode="email" autocapitalize="off" id="emailClient" placeholder="client@exemple.fr ; autre@exemple.fr">
   <div class="aidePhotos">Plusieurs adresses possibles : sépare-les par une virgule ou un point-virgule.</div>
 </div>
@@ -140,7 +143,7 @@ const URL_API = (window.CONFIG && window.CONFIG.URL_API) || '';
 function urlApiRenseignee() { return URL_API !== '' && URL_API.indexOf('COLLE_ICI') !== 0; }
 const CLE_ATTENTE = 'bonsEnAttente';
 const CLE_TECHNICIENS = 'techniciensMemorises';
-const VERSION_PAGE = '2026-11-10-b';
+const VERSION_PAGE = '2026-11-15-a';
 const COMMENTAIRE_SINGULIER = 'Intervention sur site pour la mise en longueur + jonction + réglage bande client. A contrôler en production';
 const COMMENTAIRE_PLURIEL = 'Intervention sur site pour les mises en longueur + jonctions + réglages bandes client. A contrôler en production';
 let commentaireAuto = '';
@@ -149,6 +152,7 @@ const DELAI_ENVOI_MS = 20000;      // envoi à la validation : au-delà, le bon 
 // Ouvert depuis « Commandes en cours » : ?doc=<id du PDF>&cd=<N° de commande>&client=<client>
 const PARAMS = new URLSearchParams(location.search);
 const DOC_ID = PARAMS.get('doc') || '';
+const DISTANCE = PARAMS.get('mode') === 'distance';   // bon a faire signer a distance : le client recoit un lien et signe en ligne
 
 function aujourdhui() {
   return new Date().toLocaleDateString('fr-FR');
@@ -262,6 +266,21 @@ async function init() {
     const retour = document.getElementById('retour');
     retour.href = 'commandes.html';
     retour.textContent = '← Commandes';
+  }
+  if (DISTANCE) {
+    document.title = 'Bon à signer à distance';
+    document.querySelector('h1').textContent = 'Bon à signer à distance';
+    const b = document.getElementById('bandeauDistance');
+    b.hidden = false;
+    b.innerHTML = '<b>Le client signera en ligne.</b><div class="aidePhotos">Remplis le bon comme d\'habitude. En validant, le client reçoit un lien par email pour le consulter et le signer. Le numéro du bon est attribué à l\'envoi du lien ; le bon signé revient ensuite par email au client et à Novafit. Tant qu\'il n\'est pas signé, il reste dans « Bons à signer ».</div>';
+    document.getElementById('zoneSignature').hidden = true;
+    document.getElementById('labNom').textContent = 'Nom du contact (facultatif, le client le confirmera en signant)';
+    document.getElementById('labEmail').textContent = 'Email du client (pour recevoir le lien de signature)';
+    document.getElementById('btnValider').textContent = 'Envoyer le lien de signature au client';
+    document.getElementById('numero').textContent = 'N° attribué à l\'envoi du lien';
+    const retour = document.getElementById('retour');
+    retour.href = DOC_ID ? 'commandes.html?mode=distance' : 'distance.html';
+    retour.textContent = DOC_ID ? '← Commandes' : '← Bons à signer';
   }
   if (!Nova.session()) infoHaut('Connecte-toi depuis l\'accueil : sans connexion, le bon sera gardé sur l\'appareil et ne partira qu\'après connexion.', false);
   commentaireAuto = COMMENTAIRE_SINGULIER;
@@ -476,8 +495,8 @@ async function valider() {
   const adr = emailClient.split(/[,;\s]+/).filter(Boolean);
   if (!adr.length || adr.some(a => !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a))) { msg.textContent = 'Adresse email invalide : vérifie-la (plusieurs adresses séparées par une virgule ou un point-virgule).'; return; }
   if (adr.length > 5) { msg.textContent = '5 adresses email au maximum.'; return; }
-  if (!nomSignataire) { msg.textContent = 'Le nom du signataire est obligatoire.'; return; }
-  if (!aSigne) { msg.textContent = 'La signature du client est obligatoire.'; return; }
+  if (!DISTANCE && !nomSignataire) { msg.textContent = 'Le nom du signataire est obligatoire.'; return; }
+  if (!DISTANCE && !aSigne) { msg.textContent = 'La signature du client est obligatoire.'; return; }
 
   const bandes = [...document.querySelectorAll('.bande')].map(b => ({
     matiere: b.querySelector('.matiere').value,
@@ -493,13 +512,38 @@ async function valider() {
     commentaire: document.getElementById('commentaire').value,
     heureArrivee: lireHoraire('arrivee'),
     heureFin: lireHoraire('fin'),
-    signature: canvas.toDataURL('image/png'),
+    signature: DISTANCE ? '' : canvas.toDataURL('image/png'),
     photos: photos.slice(),
     docId: DOC_ID
   };
 
   const btn = document.getElementById('btnValider');
   btn.disabled = true;
+
+  // Bon a signer a distance : envoi du lien au client (file d'attente de l'appareil si le reseau manque, envoi des que possible)
+  if (DISTANCE) {
+    delete donnees.signature;
+    donnees.urlSigner = new URL('signer.html', location.href).href;
+    const libelle = 'Bon à signer : ' + client;
+    msg.textContent = 'Envoi du lien au client...';
+    try {
+      const res = await Nova.envoyerOuGarder('distanceCreer', donnees, libelle, 40000);
+      if (res.enAttente) { allerAccueil('attente', 'Bon préparé et gardé sur l\'appareil. Le lien partira chez le client dès que le réseau le permet (bouton « Bons à signer »).'); return; }
+      allerAccueil('ok', 'Lien envoyé au client : bon ' + res.numero + ' en attente de signature.' + (res.avertissement ? ' ⚠ ' + res.avertissement : ''));
+    } catch (e) {
+      if (e.code === 'stop' || e.code === 'limite') {
+        Nova.garderEnFile('distanceCreer', donnees, libelle);
+        allerAccueil('attente', 'Bon préparé et gardé sur l\'appareil, pas encore envoyé. ' + e.message);
+      } else if (e.code === 'session') {
+        Nova.garderEnFile('distanceCreer', donnees, libelle);
+        allerAccueil('attente', 'Bon préparé et gardé sur l\'appareil. Connecte-toi pour que le lien parte.');
+      } else {
+        msg.textContent = 'Échec : ' + e.message;
+        btn.disabled = false;
+      }
+    }
+    return;
+  }
 
   // 1. Le bon est d'abord gardé sur l'appareil : il ne peut plus se perdre, même si le réseau lâche
   const liste = lireAttente();

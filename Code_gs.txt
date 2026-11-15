@@ -1,0 +1,2150 @@
+// ====== A PERSONNALISER (une seule fois) ======
+const NOM_ONGLET_TECHNICIENS = 'Techniciens';
+const EMAIL_ENTREPRISE = 'technique@novafit.fr';                 // recoit une copie de chaque bon
+const NOM_ENTREPRISE = 'Novafit';
+const EMAIL_EXPEDITEUR = 'info@novafit.fr';                 // adresse de reponse (ou expediteur en mode graph)
+const MODE_ENVOI = 'graph';                                 // 'gmail' ou 'graph' (voir PROCEDURE.txt, etape 3b)
+const LOGO_DRIVE_ID = '10zPggCcLaKFpq55JYD7bCV6p7U2FupPh';              // logo du PDF du bon
+const URL_JONCTION = 'https://script.google.com/macros/s/AKfycbwjkC7rNj5o6RDJGFDoHe9hRcFtqAkngrs2_XarVGiLBD7PvR1oUL8IT2UfmMMH2dL2/exec';  // adresse /exec du script du Sheet Jonction
+const NC_SHEET_ID = '';                                     // Google Sheet des non-conformites (laisser vide : il est cree tout seul au premier usage)
+const ACHATS_SHEET_ID = '';                                  // Google Sheet des achats (laisser vide : il est cree tout seul au premier usage)
+const ACHATS_EXPEDITEUR = 'administratif@novafit.fr';       // boite qui envoie les commandes fournisseurs (mode graph : a autoriser dans l'application Azure)
+const ACHATS_SIGNATAIRE = 'Patricia BOUVIER';               // nom sur le mail et le PDF
+const ACHATS_TEL = '04.28.35.03.20';
+const URL_SIGNATURE = '';                                    // adresse de la page de signature envoyee aux clients, ex : 'https://www.novafit.fr/intervention/signer.html' (vide = adresse du site utilise pour envoyer le bon)
+const ACHATS_PREFIXE = 'ATELIER';                           // numeros : ATELIER 26-0084, ATELIER 26-0085... (26 = annee ; repart a 0001 chaque 1er janvier)
+// --- Protections contre les envois en rafale ---
+const PLAFOND_JOUR = 25;             // nombre maximum de mails envoyes par jour, tous utilisateurs confondus
+const PLAFOND_HEURE_PERSONNE = 2;    // nombre maximum de mails par heure et par personne
+const DISTANCE_JOURS = 7;            // duree de validite du lien de signature envoye au client
+const DISTANCE_RAPPEL_JOURS = 2;     // apres ce nombre de jours sans signature, le bon passe en rouge dans la liste
+const SEUIL_ALERTE_PERSONNE = 5;     // au-dela de ce nombre d'envois dans la journee pour une personne, voyant orange sur l'accueil de l'administrateur
+const ACHATS_PREMIER_NUMERO = 84;                           // premier numero de la 1re annee, utilise seulement tant que l'onglet Config des achats est vide
+const NOM_DOSSIER_ACHATS = 'Commandes fournisseurs';        // dossier Drive des PDF de commande (cree automatiquement)
+const NOM_DOSSIER_EN_COURS = 'Commande en cours';           // dossier Drive des PDF de commande a realiser
+const NOM_DOSSIER_BONS = 'Bons d\'intervention';           // dossier Drive ou est range le PDF de chaque bon (cree automatiquement)
+const NOM_DOSSIER_ASIGNER = 'Bons à signer';              // dossier Drive des bons en attente de signature du client (supprimes une fois signes)
+const NOM_DOSSIER_FAIT = 'Intervention faite';              // dossier Drive ou ils sont deplaces apres le bon
+
+const AGENCES = [
+  {
+    adresse: "3 bis, Rue de l'égalité - 74960 Annecy",
+    tel: '04 50 45 04 02',
+    horaires: ['Lundi à Jeudi : 8h-12h / 13h30-17h30', 'Vendredi : 8h-12h / 13h30-17h']
+  },
+  {
+    adresse: '13 Rue des Saules - 38110 St-Jean-de-Soudain',
+    tel: '04 28 35 03 20',
+    horaires: ['Lundi à Jeudi : 8h-12h / 13h30-17h30', 'Vendredi : 8h-12h / 13h30-17h']
+  }
+];
+// =============================
+
+const VERSION_SCRIPT = '2026-11-15-b';
+const DUREE_JETON_H = 12;      // duree de la connexion
+const LIMITE_LIGNES = 5000;    // lignes maximum envoyees a l'ecran "Interventions finies"
+// --- Comptes personnels et droits ---
+const LOGIN_ANCIEN = true;   // true : les anciens codes communs (script Jonction) marchent encore. Passer a false une fois les comptes crees.
+const DROITS_FEUILLE = ['jonction', 'intervention', 'nc', 'achats', 'gestion', 'fournisseurs', 'admin'];   // colonnes D a J du Sheet Utilisateurs (ne pas changer l'ordre)
+const DROITS = DROITS_FEUILLE.concat(['distance']);   // « distance » (bon a signer a distance) : colonne M du Sheet Utilisateurs
+const DROITS_ANCIENS = { technicien: ['jonction', 'intervention'], gestionnaire: ['jonction', 'intervention', 'nc', 'achats', 'gestion'], admin: ['admin'] };
+const USERS_SHEET_ID = '';      // vide = Sheet « Utilisateurs Novafit » cree automatiquement (id garde dans les proprietes du script)
+const ANNUAIRE_SHEET_ID = '';   // vide = Sheet « Annuaire fournisseurs Novafit » cree automatiquement
+// --- Protections d'envoi (mails de bons et de commandes) ---
+const EXPEDITEUR = EMAIL_EXPEDITEUR;
+const MODE = MODE_ENVOI;
+
+// A executer UNE fois a la main (menu des fonctions > "autoriser" > Executer) pour accorder les autorisations.
+function autoriser() {
+  SpreadsheetApp.getActiveSpreadsheet().getName();
+  MailApp.getRemainingDailyQuota();
+  PropertiesService.getScriptProperties().getKeys();
+  CacheService.getScriptCache();
+  DriveApp.getRootFolder();
+  LockService.getScriptLock();
+  try { DriveApp.getFileById(LOGO_DRIVE_ID); } catch (e) {}
+  try { SpreadsheetApp.openById('autorisation'); } catch (e) {}
+  try { UrlFetchApp.fetch('https://login.microsoftonline.com/', { muteHttpExceptions: true }); } catch (e) {}   // droit d'ouvrir/creer le Sheet des non-conformites
+}
+
+
+// =====================================================================
+// Init de la page de saisie (liste des techniciens, numero provisoire)
+// =====================================================================
+function doGet(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sh = ss.getSheetByName(NOM_ONGLET_TECHNICIENS);
+    if (!sh) throw new Error('Onglet « ' + NOM_ONGLET_TECHNICIENS + ' » introuvable dans le Google Sheet (vérifie le nom en haut de Code.gs).');
+    if (!ss.getSheetByName('Config')) throw new Error('Onglet « Config » introuvable dans le Google Sheet.');
+    if (!ss.getSheetByName('Bons')) throw new Error('Onglet « Bons » introuvable dans le Google Sheet.');
+    const noms = sh.getRange(2, 1, Math.max(sh.getLastRow() - 1, 1), 1)
+      .getValues().flat().filter(String);
+    const numero = prochainNumero();
+    return jsonOut({ techniciens: noms, numero: numero, version: VERSION_SCRIPT });
+  } catch (err) {
+    return jsonOut({ erreur: String(err.message || err) });
+  }
+}
+
+function jsonOut(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function numeroBon_(n) { return 'BI-' + new Date().getFullYear() + '-' + String(n).padStart(4, '0'); }
+
+// Dernier numero attribue : le compteur (B1) ou, s'il est plus haut, le plus grand numero deja note dans la colonne E de l'onglet Config
+function dernierNumeroBon_() {
+  const cfg = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config');
+  let max = Number(cfg.getRange('B1').getValue()) || 0;
+  const n = cfg.getLastRow();
+  if (n >= 2) {
+    const prefixe = 'BI-' + new Date().getFullYear() + '-';
+    cfg.getRange(2, 5, n - 1, 1).getValues().forEach(function (r) {
+      const t = String(r[0] || '');
+      if (t.indexOf(prefixe) === 0) max = Math.max(max, Number(t.slice(prefixe.length)) || 0);
+    });
+  }
+  return max;
+}
+
+// Numero propose a l'ecran (n'augmente pas le compteur : l'ouverture d'un bon ou d'une commande ne consomme jamais de numero)
+function prochainNumero() { return numeroBon_(dernierNumeroBon_() + 1); }
+
+// Numero pris au moment ou le script recoit un bon valide (clic sur « Valider et envoyer ») : le compteur monte tout de suite.
+// Si l'ecriture dans le Sheet echoue juste apres, le compteur est remis comme avant (aucun numero perdu).
+function prendreNumeroBon_() {
+  const cfg = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config');
+  const avant = Number(cfg.getRange('B1').getValue()) || 0;
+  const n = dernierNumeroBon_() + 1;
+  cfg.getRange('B1').setValue(n);
+  return { numero: numeroBon_(n), avant: avant };
+}
+
+// =====================================================================
+// Reponses, droits et jeton de connexion
+// =====================================================================
+function repondre(fonction) {
+  try { return fonction(); } catch (err) { return { ok: false, erreur: String(err.message || err), code: err.code || '' }; }
+}
+
+function erreurCode_(code, message) {
+  const e = new Error(message);
+  e.code = code;
+  return e;
+}
+
+// Droits d'un utilisateur. L'administrateur a tous les droits.
+function aDroit_(u, droit) { return u.droits.indexOf('admin') >= 0 || u.droits.indexOf(droit) >= 0; }
+
+// Verifie le jeton et le droit demande ; renvoie { nom, droits }
+// Nom a ecrire dans les colonnes « Saisi par » : le compte personnel, ou « Code commun <niveau> » pour un ancien code
+function nomSaisie_(u) { return u.nom.charAt(0) === '#' ? 'Code commun ' + u.nom.slice(1) : u.nom; }
+
+function sessionRequise_(jeton) {
+  const nom = lireJeton(jeton);
+  const u = nom ? utilisateurDe_(nom) : null;
+  if (!u) throw erreurCode_('session', 'Session expirée ou invalide : reconnecte-toi depuis l\'accueil.');
+  return u;
+}
+function droitRequis_(jeton, droit) {
+  const u = sessionRequise_(jeton);
+  if (!aDroit_(u, droit)) throw erreurCode_('acces', 'Ton compte n\'a pas accès à cette fonction.');
+  return u;
+}
+
+// Niveau "historique" deduit des droits (sert seulement a l'affichage de l'accueil)
+function niveauDe_(droits) {
+  if (droits.indexOf('admin') >= 0) return 'admin';
+  if (droits.indexOf('gestion') >= 0 || droits.indexOf('nc') >= 0 || droits.indexOf('achats') >= 0 || droits.indexOf('fournisseurs') >= 0) return 'gestionnaire';
+  return 'technicien';
+}
+function droitsComplets_(droits) { return droits.indexOf('admin') >= 0 ? DROITS.slice() : droits.slice(); }
+
+// Compte actif d'apres le jeton. Les droits viennent toujours du Sheet (cache 60 s) : un compte desactive ou modifie
+// perd ses acces en moins d'une minute, sans attendre la fin de la connexion.
+function utilisateurDe_(nom) {
+  if (nom.charAt(0) === '#') {   // connexion avec un ancien code commun
+    const d = DROITS_ANCIENS[nom.slice(1)];
+    return LOGIN_ANCIEN && d ? { nom: nom, droits: droitsComplets_(d) } : null;
+  }
+  return utilisateursActifs_()[nom] || null;
+}
+function utilisateursActifs_() {
+  const cache = CacheService.getScriptCache();
+  try { const c = cache.get('UTILISATEURS_V1'); if (c) return JSON.parse(c); } catch (e) {}
+  const m = {};
+  usersLireTout_().forEach(function (u) { if (u.actif) m[u.nom] = { nom: u.nom, droits: droitsComplets_(u.droits) }; });
+  try { cache.put('UTILISATEURS_V1', JSON.stringify(m), 60); } catch (e) {}
+  return m;
+}
+function usersOublierCache_() { try { CacheService.getScriptCache().remove('UTILISATEURS_V1'); } catch (e) {} }
+
+// Les anciens codes communs se trouvent dans le script Jonction (CODE_ACCES, CODE_GESTIONNAIRE, CODE_ADMIN) :
+// on lui demande de verifier le code ; il repond { rows, admin, gestionnaire }. Sert uniquement tant que LOGIN_ANCIEN est vrai.
+
+function niveauDuCode(code) {
+  code = String(code || '');
+  if (!code) return null;
+  if (!URL_JONCTION || URL_JONCTION.indexOf('COLLE_ICI') === 0) throw new Error('URL_JONCTION non renseignée en haut de Code.gs.');
+  const rep = UrlFetchApp.fetch(URL_JONCTION + '?code=' + encodeURIComponent(code) + '&t=' + Date.now(), { muteHttpExceptions: true });
+  let j = null;
+  try { j = JSON.parse(rep.getContentText()); } catch (e) {
+    throw new Error('Vérification impossible auprès du script Jonction (accès « Tout le monde » à vérifier).');
+  }
+  if (j && Array.isArray(j.rows)) return j.admin ? 'admin' : (j.gestionnaire ? 'gestionnaire' : 'technicien');
+  return null;
+}
+
+function connexion(code, appareil) {
+  if (tropDEchecs()) return { ok: false, erreur: 'Trop de tentatives incorrectes : réessaie dans quelques minutes.', code: 'tentatives' };
+  code = String(code || '').trim();
+  const perso = code ? usersParCode_(code) : null;
+  let ancien = '';
+  if (!perso && LOGIN_ANCIEN) ancien = niveauDuCode(code) || '';
+  if (!perso && !ancien) { noterEchecConnexion(); return { ok: false, erreur: 'Mot de passe incorrect.', code: 'mdp' }; }
+  let nom, droits;
+  if (perso) {
+    nom = perso.nom; droits = droitsComplets_(perso.droits);
+    usersEnregistrerAppareil_(perso, appareil);
+  } else {
+    nom = '#' + ancien; droits = droitsComplets_(DROITS_ANCIENS[ancien]);
+  }
+  return { ok: true, nom: perso ? nom : ancien, niveau: niveauDe_(droits), droits: droits, jeton: creerJeton(nom),
+    jonction: secretsJonction_(droits, code, ancien) };
+}
+
+// Codes du script Jonction a memoriser sur l'appareil (la page Jonction parle directement a ce script).
+// Compte personnel : codes lus dans les proprietes du script (JONCTION_CODE_ACCES / JONCTION_CODE_ADMIN), selon les droits.
+function secretsJonction_(droits, codeSaisi, ancien) {
+  if (ancien) return { code: codeSaisi, admin: ancien === 'admin' ? codeSaisi : '' };
+  const p = PropertiesService.getScriptProperties();
+  const acces = p.getProperty('JONCTION_CODE_ACCES') || '', adm = p.getProperty('JONCTION_CODE_ADMIN') || '';
+  const peutAdmin = droits.indexOf('admin') >= 0;
+  return { code: droits.indexOf('jonction') >= 0 ? (acces || (peutAdmin ? adm : '')) : '', admin: peutAdmin ? adm : '' };
+}
+
+// Jeton signe : nom|expiration (les droits ne sont pas dans le jeton, voir utilisateurDe_)
+function lireJeton(jeton) {
+  const t = String(jeton || '');
+  const i = t.indexOf('.');
+  if (i < 1) return null;
+  const charge = t.slice(0, i);
+  if (t.slice(i + 1) !== signer(charge)) return null;
+  const morceaux = Utilities.newBlob(Utilities.base64DecodeWebSafe(charge)).getDataAsString().split('|');
+  if (morceaux.length < 2 || Number(morceaux[morceaux.length - 1]) < Date.now()) return null;
+  return morceaux.slice(0, -1).join('|');
+}
+
+// =====================================================================
+// Appels de l'application
+// =====================================================================
+function doPost(e) {
+  let d;
+  try { d = JSON.parse(e.postData.contents); } catch (err) { return jsonOut({ ok: false, erreur: 'format' }); }
+  switch (d.action) {
+    case 'login': return jsonOut(repondre(() => connexion(d.code, d.appareil)));
+    case 'distanceCreer': return jsonOut(repondre(() => distanceCreer(d.jeton, d)));
+    case 'distanceListe': return jsonOut(repondre(() => distanceListe(d.jeton)));
+    case 'distanceResume': return jsonOut(repondre(() => distanceResume(d.jeton)));
+    case 'distanceRenvoyer': return jsonOut(repondre(() => distanceRenvoyer(d.jeton, d.numero, d.urlSigner)));
+    case 'distanceAnnuler': return jsonOut(repondre(() => distanceAnnuler(d.jeton, d.numero)));
+    case 'signLire': return jsonOut(repondre(() => distanceLire(d.t)));      // page publique du client (le lien secret fait office de code)
+    case 'signValider': return jsonOut(repondre(() => distanceSigner(d.t, d.nom, d.signature)));
+    case 'commandes': return jsonOut(repondre(() => listerCommandes(d.jeton)));
+    case 'document': return jsonOut(repondre(() => lireDocument(d.jeton, d.id)));
+    case 'termines': return jsonOut(repondre(() => donneesTermines(d.jeton)));
+    case 'modifier': return jsonOut(repondre(() => modifierLignes(d.jeton, d.modifications)));
+    case 'achatInit': return jsonOut(repondre(() => achatInit(d.jeton)));
+    case 'achatListe': return jsonOut(repondre(() => achatListe(d.jeton)));
+    case 'achatCreer': return jsonOut(repondre(() => achatCreer(d.jeton, d)));
+    case 'achatRecue': return jsonOut(repondre(() => achatRecue(d.jeton, d.ligne, d.numero, d.valeur)));
+    case 'achatRenvoyer': return jsonOut(repondre(() => achatRenvoyer(d.jeton, d.ligne, d.numero)));
+    case 'achatApercu': return jsonOut(repondre(() => achatApercu(d.jeton, d)));
+    case 'usersResume': return jsonOut(repondre(() => usersResume(d.jeton)));
+    case 'usersBloquer': return jsonOut(repondre(() => usersBloquer(d.jeton, !!d.bloquer)));
+    case 'usersListe': return jsonOut(repondre(() => usersListe(d.jeton)));
+    case 'usersSauver': return jsonOut(repondre(() => usersSauver(d.jeton, d.utilisateur)));
+    case 'usersCreer': return jsonOut(repondre(() => usersCreer(d.jeton, d.utilisateur)));
+    case 'usersNouveauCode': return jsonOut(repondre(() => usersNouveauCode(d.jeton, d.ligne, d.ancienNom)));
+    case 'usersAppareil': return jsonOut(repondre(() => usersAppareilAction(d.jeton, d.ligne, d.nom, d.id, d.choix)));
+    case 'fourListe': return jsonOut(repondre(() => fourListe(d.jeton)));
+    case 'fourAjouter': return jsonOut(repondre(() => fourAjouter(d.jeton, d.fournisseur)));
+    case 'fourSauver': return jsonOut(repondre(() => fourSauver(d.jeton, d.fournisseur)));
+    case 'fourSupprimer': return jsonOut(repondre(() => fourSupprimer(d.jeton, d.ligne, d.nom)));
+    case 'fourTagAjouter': return jsonOut(repondre(() => fourTagAjouter(d.jeton, d.tag)));
+    case 'fourTagRenommer': return jsonOut(repondre(() => fourTagRenommer(d.jeton, d.ancien, d.nouveau)));
+    case 'ncSchema': return jsonOut(repondre(() => ncSchema(d.jeton)));
+    case 'ncStats': return jsonOut(repondre(() => ncStats(d.jeton)));
+    case 'ncListe': return jsonOut(repondre(() => ncListe(d.jeton)));
+    case 'ncAjouter': return jsonOut(repondre(() => ncAjouter(d.jeton, d.type, d.valeurs, d.idEnvoi)));
+  }
+  return jsonOut(repondre(() => enregistrerBon(d)));
+}
+
+// Enregistrement d'un bon : Sheet, PDF et mails, puis deplacement de la commande.
+// Chaque etape est memorisee (onglet Config, colonnes D a F) : un bon renvoye ne repasse pas par les etapes deja faites.
+// Plusieurs adresses possibles, separees par une virgule, un point-virgule ou un espace (5 au maximum)
+function adressesClient_(texte) {
+  const vues = {}, ok = [];
+  String(texte || '').split(/[,;\s]+/).forEach(function (a) {
+    a = a.trim();
+    if (a && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a) && !vues[a.toLowerCase()]) { vues[a.toLowerCase()] = 1; ok.push(a); }
+  });
+  return ok.slice(0, 5);
+}
+
+function enregistrerBon(d) {
+  const utilisateur = droitRequis_(d.jeton, 'intervention');
+  const adr = adressesClient_(d.emailClient);
+  if (!adr.length) throw new Error('Adresse email du client invalide : vérifie-la (plusieurs adresses possibles, séparées par une virgule ou un point-virgule).');
+  if (!Array.isArray(d.bandes) || !d.bandes.length) throw new Error('Le bon ne contient aucune bande : ajoutes-en une avant de valider.');
+  d.emailClient = adr.join('; ');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    const envoi = trouverEnvoi(d.idEnvoi);
+    if (envoi && envoi.statut === 'envoye') return { ok: true, numero: envoi.numero, doublon: true };
+
+    // Protections d'envoi : verifiees AVANT d'ecrire quoi que ce soit dans le Sheet (arret d'urgence, plafonds)
+    const aEnvoyer = !envoi || envoi.statut === 'ecrit';
+    const reservation = aEnvoyer ? reserverEnvoi_(utilisateur, 'bon') : null;
+    let avertPdf = '';
+    let ecritureEnCours = false;
+    let numeroPris = null;
+    try {
+      let statut = 'ecrit';
+      if (envoi) {
+        d.numero = envoi.numero;
+        statut = envoi.statut;
+      } else {
+        // le numero est pris maintenant (clic sur « Valider et envoyer ») et reste attribue a ce bon, meme si le mail echoue
+        ecritureEnCours = true;
+        numeroPris = prendreNumeroBon_();
+        d.numero = numeroPris.numero;
+        ecrireDansSheet(d);
+        noterEnvoi(d.idEnvoi, d.numero);
+        ecritureEnCours = false;
+      }
+      if (statut === 'ecrit') {
+        const pdf = genererPdf(d);
+        avertPdf = sauverPdfBon_(d, pdf);
+        envoyerMails(d, pdf);
+        marquerStatut(d.idEnvoi, 'mail');
+      }
+    } catch (e) {
+      annulerEnvoi_(reservation);   // l'envoi rate ne compte pas dans les plafonds ; le bon et son numero restent, il repartira tel quel
+      if (ecritureEnCours && numeroPris) {   // ecriture dans le Sheet impossible : on rend le numero
+        try { SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config').getRange('B1').setValue(numeroPris.avant); } catch (x) {}
+      }
+      throw e;
+    }
+    const avertissement = [avertPdf, d.docId ? deplacerCommande(d.docId) : ''].filter(String).join(' ');
+    marquerStatut(d.idEnvoi, 'envoye');
+    return { ok: true, numero: d.numero, avertissement: avertissement };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function marquerStatut(id, statut) {
+  const envoi = trouverEnvoi(id);
+  if (!envoi) return;
+  SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config').getRange(envoi.ligne, 6).setValue(statut);
+}
+
+// Une cellule qui commencerait par "=" serait prise pour une formule : on la force en texte
+function neutraliser_(v) {
+  const t = String(v == null ? '' : v);
+  return t.charAt(0) === '=' ? "'" + t : t;
+}
+
+// Colonnes : A N° de BL | B N° de commande | C Date | D Client | E Email | F Nom du signataire | G Technicien |
+//            H Matiere | I Largeur | J Longueur | K Commentaire bande | L Commentaire intervention | M Heure debut | N Heure fin
+function ecrireDansSheet(d) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Bons');
+  const lignes = d.bandes.map(b => [
+    d.numero, d.numeroCommande || '', d.date, d.client, d.emailClient, d.nomSignataire || '', d.technicien,
+    b.matiere, b.largeur, b.longueur, b.commentaire || '', d.commentaire, d.heureArrivee, d.heureFin
+  ].map(neutraliser_));
+  sh.getRange(sh.getLastRow() + 1, 1, lignes.length, lignes[0].length).setValues(lignes);
+}
+
+// =====================================================================
+// Drive : dossiers "Commande en cours" et "Intervention faite"
+// =====================================================================
+function trouverDossier_(nom) {
+  const p = PropertiesService.getScriptProperties();
+  const cle = 'ID_DOSSIER:' + nom;
+  const memo = p.getProperty(cle);
+  if (memo) {
+    try { const f = DriveApp.getFolderById(memo); if (!f.isTrashed()) return f; } catch (e) {}
+  }
+  const it = DriveApp.getFoldersByName(nom);
+  while (it.hasNext()) {
+    const f = it.next();
+    if (!f.isTrashed()) { p.setProperty(cle, f.getId()); return f; }
+  }
+  return null;
+}
+
+function dossierEnCours() {
+  const f = trouverDossier_(NOM_DOSSIER_EN_COURS);
+  if (!f) throw new Error('Dossier « ' + NOM_DOSSIER_EN_COURS + ' » introuvable dans le Drive.');
+  return f;
+}
+
+// "Intervention faite" est cree a cote de "Commande en cours" s'il n'existe pas encore
+function dossierFait() {
+  let f = trouverDossier_(NOM_DOSSIER_FAIT);
+  if (f) return f;
+  const parents = dossierEnCours().getParents();
+  const parent = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+  f = parent.createFolder(NOM_DOSSIER_FAIT);
+  PropertiesService.getScriptProperties().setProperty('ID_DOSSIER:' + NOM_DOSSIER_FAIT, f.getId());
+  return f;
+}
+
+function dossierBons() {
+  let f = trouverDossier_(NOM_DOSSIER_BONS);
+  if (f) return f;
+  const parents = dossierEnCours().getParents();
+  const parent = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+  f = parent.createFolder(NOM_DOSSIER_BONS);
+  PropertiesService.getScriptProperties().setProperty('ID_DOSSIER:' + NOM_DOSSIER_BONS, f.getId());
+  return f;
+}
+
+// Range le PDF du bon dans Drive (sans bloquer l'envoi si ca echoue) ; renvoie un avertissement ou ''
+function sauverPdfBon_(d, pdf) {
+  try {
+    const nom = (d.numero + ' - ' + String(d.client || '').replace(/[\\\/:*?"<>|]/g, ' ').trim()).trim() + '.pdf';
+    const dossier = dossierBons();
+    if (dossier.getFilesByName(nom).hasNext()) return '';
+    dossier.createFile(pdf.copyBlob().setName(nom));
+    return '';
+  } catch (e) {
+    return 'Le PDF du bon n\'a pas pu être rangé dans Drive : ' + String(e.message || e);
+  }
+}
+
+function parentDans_(fichier, dossier) {
+  if (!dossier) return false;
+  const it = fichier.getParents();
+  while (it.hasNext()) { if (it.next().getId() === dossier.getId()) return true; }
+  return false;
+}
+
+// "12345 - Dupont SA.pdf" -> N° de commande 12345, client Dupont SA
+// Sans " - " : coupe au premier espace ("12345 Dupont SA.pdf"), sinon au premier "_".
+function analyserNomDocument_(nom) {
+  const base = String(nom).replace(/\.pdf$/i, '').trim();
+  // « CD26xxxx - Client », « CD26xxxx-Client » ou « CD26xxxx – Client » : tout ce qui suit le premier tiret est le client
+  let m = base.match(/^(.+?)\s+[-–—]\s+(.+)$/);            // « CD-2026-07 - Client » (tiret entouré d'espaces)
+  if (!m) m = base.match(/^([^-–—]+?)\s*[-–—]\s*(.+)$/);   // « CD260123-Client » (tiret collé)
+  if (!m) m = base.match(/^(\S+)\s+(.+)$/);
+  if (!m) m = base.match(/^([^_]+)_(.+)$/);
+  return m ? { cd: m[1].trim(), client: m[2].trim() } : { cd: base, client: '' };
+}
+
+function normaliserCd_(s) {
+  return String(s || '').toLowerCase().replace(/\s+/g, '');
+}
+
+function listerCommandes(jeton) {
+  const u = sessionRequise_(jeton);
+  if (!aDroit_(u, 'intervention') && !aDroit_(u, 'distance')) throw erreurCode_('acces', 'Ton compte n\'a pas accès à cette fonction.');
+  const it = dossierEnCours().getFilesByType(MimeType.PDF);
+  const commandes = [];
+  while (it.hasNext()) {
+    const f = it.next();
+    const a = analyserNomDocument_(f.getName());
+    commandes.push({ id: f.getId(), nom: f.getName(), cd: a.cd, client: a.client, ts: f.getDateCreated().getTime() });
+  }
+  commandes.sort((x, y) => y.ts - x.ts);
+  return { ok: true, commandes: commandes };
+}
+
+// Renvoie le PDF (base64) : seuls les fichiers des deux dossiers sont accessibles ;
+// les documents deja traites ("Intervention faite") sont reserves aux gestionnaires et administrateurs.
+function lireDocument(jeton, id) {
+  sessionRequise_(jeton);
+  let fichier;
+  try { fichier = DriveApp.getFileById(String(id)); } catch (e) { throw new Error('Document introuvable.'); }
+  const dansCours = parentDans_(fichier, trouverDossier_(NOM_DOSSIER_EN_COURS));
+  const dansFait = parentDans_(fichier, trouverDossier_(NOM_DOSSIER_FAIT)) || parentDans_(fichier, trouverDossier_(NOM_DOSSIER_BONS));
+  const dansAchats = parentDans_(fichier, trouverDossier_(NOM_DOSSIER_ACHATS));
+  if (!dansCours && !dansFait && !dansAchats) throw erreurCode_('acces', 'Document non autorisé.');
+  if (dansAchats) droitRequis_(jeton, 'achats');
+  else if (dansFait && !dansCours) droitRequis_(jeton, 'gestion');
+  else droitRequis_(jeton, 'intervention');
+  if (fichier.getSize() > 20 * 1024 * 1024) throw new Error('Document trop volumineux pour l\'affichage (plus de 20 Mo).');
+  const blob = fichier.getBlob();
+  const a = analyserNomDocument_(fichier.getName());
+  return {
+    ok: true, nom: fichier.getName(), cd: a.cd, client: a.client,
+    dossier: dansCours ? 'cours' : 'faite',
+    mime: blob.getContentType(), donnees: Utilities.base64Encode(blob.getBytes())
+  };
+}
+
+// Apres l'envoi du bon : la commande passe de "Commande en cours" a "Intervention faite" (sans bloquer le bon si ca echoue)
+function deplacerCommande(docId) {
+  try {
+    const fichier = DriveApp.getFileById(String(docId));
+    const cible = dossierFait();
+    if (parentDans_(fichier, cible)) return '';
+    if (!parentDans_(fichier, dossierEnCours())) {
+      return 'Le document de commande n\'est plus dans « ' + NOM_DOSSIER_EN_COURS + ' » : il n\'a pas été déplacé.';
+    }
+    fichier.moveTo(cible);
+    return '';
+  } catch (e) {
+    return 'Bon envoyé, mais la commande n\'a pas pu être déplacée : ' + String(e.message || e);
+  }
+}
+
+// =====================================================================
+// Interventions finies (gestionnaire et administrateur) et modification (administrateur)
+// =====================================================================
+function donneesTermines(jeton) {
+  const u = droitRequis_(jeton, 'gestion');
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Bons');
+  if (!sh) throw new Error('Onglet « Bons » introuvable dans le Google Sheet.');
+  const n = sh.getLastRow();
+  const reponse = { ok: true, entetes: [], lignes: [], numeros: [], total: 0, affiches: 0, docs: {}, admin: aDroit_(u, 'admin') };
+  if (n >= 1) {
+    const nc = Math.max(sh.getLastColumn(), 14);
+    reponse.entetes = sh.getRange(1, 1, 1, nc).getDisplayValues()[0];
+    if (n >= 2) {
+      const debut = Math.max(2, n - LIMITE_LIGNES + 1);
+      reponse.lignes = sh.getRange(debut, 1, n - debut + 1, nc).getDisplayValues();
+      reponse.numeros = reponse.lignes.map((l, i) => debut + i);
+    }
+    reponse.total = n - 1;
+    reponse.affiches = reponse.lignes.length;
+  }
+  // Documents deja traites, retrouves par le N° de commande
+  const fait = trouverDossier_(NOM_DOSSIER_FAIT);
+  if (fait) {
+    const it = fait.getFilesByType(MimeType.PDF);
+    while (it.hasNext()) {
+      const f = it.next();
+      reponse.docs[normaliserCd_(analyserNomDocument_(f.getName()).cd)] = f.getId();
+    }
+  }
+  // PDF des bons, retrouves par le N° de BL (nom du fichier : « BI-2026-0001 - Client.pdf »)
+  reponse.bons = {};
+  const dossierB = trouverDossier_(NOM_DOSSIER_BONS);
+  if (dossierB) {
+    const it2 = dossierB.getFilesByType(MimeType.PDF);
+    while (it2.hasNext()) {
+      const f = it2.next();
+      reponse.bons[f.getName().split(' - ')[0].trim()] = f.getId();
+    }
+  }
+  return reponse;
+}
+
+// modifications : [{ ligne, bl, valeurs }] ; valeurs = les 13 colonnes B a N de la ligne
+function modifierLignes(jeton, modifications) {
+  droitRequis_(jeton, 'admin');
+  if (!Array.isArray(modifications) || !modifications.length) throw new Error('Aucune modification à enregistrer.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Bons');
+    const n = sh.getLastRow();
+    const colA = sh.getRange(1, 1, Math.max(n, 1), 1).getDisplayValues();
+    modifications.forEach(m => {
+      const l = Number(m.ligne);
+      if (!l || l < 2 || l > n) throw new Error('Ligne introuvable : actualise le tableau.');
+      if (String(colA[l - 1][0]).trim() !== String(m.bl).trim()) throw new Error('Ligne modifiée entre-temps : actualise le tableau.');
+      if (!Array.isArray(m.valeurs) || m.valeurs.length !== 13) throw new Error('Données invalides.');
+    });
+    modifications.forEach(m => {
+      sh.getRange(Number(m.ligne), 2, 1, 13).setValues([m.valeurs.map(neutraliser_)]);
+    });
+    return { ok: true, modifiees: modifications.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// =====================================================================
+// Suivi anti-doublon (onglet Config, colonnes D a F) et jeton
+// =====================================================================
+function trouverEnvoi(id) {
+  if (!id) return null;
+  const cfg = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config');
+  const n = cfg.getLastRow();
+  if (n < 2) return null;
+  const vals = cfg.getRange(2, 4, n - 1, 3).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    if (vals[i][0] === id) return { ligne: i + 2, numero: vals[i][1], statut: vals[i][2] };
+  }
+  return null;
+}
+
+function noterEnvoi(id, numero) {
+  if (!id) return;
+  const cfg = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config');
+  const ligne = Math.max(cfg.getLastRow() + 1, 2);
+  cfg.getRange(ligne, 4, 1, 3).setValues([[id, numero, 'ecrit']]);
+}
+
+function tropDEchecs() {
+  return Number(CacheService.getScriptCache().get('echecsConnexion') || 0) >= 15;
+}
+
+function noterEchecConnexion() {
+  const c = CacheService.getScriptCache();
+  c.put('echecsConnexion', String(Number(c.get('echecsConnexion') || 0) + 1), 600);
+}
+
+function secretJeton() {
+  const p = PropertiesService.getScriptProperties();
+  let s = p.getProperty('JETON_SECRET');
+  if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); p.setProperty('JETON_SECRET', s); }
+  return s;
+}
+
+function signer(texte) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(texte, secretJeton()));
+}
+
+function creerJeton(nom) {
+  const charge = Utilities.base64EncodeWebSafe(nom + '|' + (Date.now() + DUREE_JETON_H * 3600 * 1000));
+  return charge + '.' + signer(charge);
+}
+
+
+// =====================================================================
+// PDF du bon et mails
+// =====================================================================
+// Logo depuis Drive (sert au PDF)
+function chargerLogo() {
+  if (!LOGO_DRIVE_ID || LOGO_DRIVE_ID === 'ID_DU_LOGO_DANS_DRIVE') {
+    return { erreur: 'identifiant du logo non renseigné dans Code.gs (LOGO_DRIVE_ID)' };
+  }
+  try {
+    const blob = DriveApp.getFileById(LOGO_DRIVE_ID).getBlob();
+    const type = String(blob.getContentType());
+    if (!/^image\/(png|jpeg|gif)/.test(type)) {
+      return { erreur: 'format non pris en charge (' + type + '), utilise un PNG ou un JPG' };
+    }
+    return { dataUrl: 'data:' + type + ';base64,' + Utilities.base64Encode(blob.getBytes()) };
+  } catch (e) {
+    return { erreur: 'logo inaccessible dans Drive, vérifie l\'identifiant et l\'accès au fichier (' + String(e.message || e) + ')' };
+  }
+}
+
+function blocAgence(a) {
+  return '<div style="font-size:9px;line-height:1.5;text-align:center">' +
+    '<b>' + esc(a.adresse) + '</b><br>' +
+    'Tél : ' + esc(a.tel) + '<br>' +
+    esc(EMAIL_ENTREPRISE) + '<br>' +
+    a.horaires.map(h => esc(h)).join('<br>') + '</div>';
+}
+
+// Photos jointes (JPEG reduits par l'application) : au plus 8, controle du format et de la taille
+function photosValides_(d) {
+  const l = Array.isArray(d.photos) ? d.photos : [];
+  return l.slice(0, 8).filter(function (p) { return typeof p === 'string' && /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(p) && p.length <= 600000; });
+}
+function pagePhotosHtml_(d) {
+  const ph = photosValides_(d);
+  if (!ph.length) return '';
+  let lignes = '';
+  for (let i = 0; i < ph.length; i += 2) {
+    lignes += '<tr>' + [ph[i], ph[i + 1]].map(function (p) {
+      return '<td align="center" style="width:50%;padding:6px;vertical-align:top">' + (p ? '<img src="' + p + '" style="max-width:320px;max-height:300px">' : '') + '</td>';
+    }).join('') + '</tr>';
+  }
+  return '<div style="page-break-before:always"><h2 style="margin:0 0 6px">Photos de l\'intervention</h2>' +
+    '<div style="font-size:12px;margin-bottom:10px">Bon N° ' + esc(d.numero) + ' · ' + esc(d.client) + ' · ' + esc(d.date) + '</div>' +
+    '<table style="width:100%">' + lignes + '</table></div>';
+}
+
+function genererPdf(d) {
+  const logo = chargerLogo();
+  const logoHtml = logo.dataUrl
+    ? '<img src="' + logo.dataUrl + '" style="max-height:70px">'
+    : '<div style="font-size:16px;font-weight:bold">' + esc(NOM_ENTREPRISE) + '</div>';
+
+  const centre = 'align="center" style="text-align:center;vertical-align:middle"';
+  const centreTitre = 'align="center" style="text-align:center;vertical-align:middle;background:#eee"';
+  // Colonne "Commentaire" du tableau : seulement si au moins une bande a un commentaire
+  const avecCom = d.bandes.some(b => String(b.commentaire || '').trim() !== '');
+  const lignesBandes = d.bandes.map((b, i) =>
+    '<tr><td ' + centre + '>' + (i + 1) + '</td><td ' + centre + '>' + esc(b.matiere) + '</td><td ' + centre + '>' +
+    esc(b.largeur) + '</td><td ' + centre + '>' + esc(b.longueur) + '</td>' +
+    (avecCom ? '<td ' + centre + '>' + esc(b.commentaire).replace(/\n/g, '<br>') + '</td>' : '') +
+    '</tr>').join('');
+
+  const blocsAgences = AGENCES.map(a =>
+    '<td align="center" style="vertical-align:top;text-align:center">' + blocAgence(a) + '</td>').join('');
+
+  const html =
+    '<html><body style="font-family:Arial,sans-serif;font-size:12px;color:#222">' +
+    '<table style="width:100%"><tr><td style="vertical-align:middle">' + logoHtml + '</td>' +
+    '<td style="text-align:right;vertical-align:middle"><h1 style="margin:0">BON D\'INTERVENTION</h1>' +
+    '<div style="font-size:14px">N° ' + d.numero + '</div>' +
+    (d.numeroCommande ? '<div style="font-size:12px">N° de commande : ' + esc(d.numeroCommande) + '</div>' : '') +
+    '</td></tr></table><hr>' +
+    '<table style="width:100%;margin-bottom:12px">' +
+    '<tr><td><b>Client :</b> ' + esc(d.client) + '</td><td><b>Date :</b> ' + esc(d.date) + '</td></tr>' +
+    '<tr><td><b>Technicien(s) :</b> ' + esc(d.technicien) + '</td>' +
+    '<td><b>Horaires :</b> ' + esc(d.heureArrivee) + ' - ' + esc(d.heureFin) + '</td></tr></table>' +
+    '<table style="width:100%;border-collapse:collapse" border="1" cellpadding="6">' +
+    '<tr><th ' + centreTitre + '>Bande</th><th ' + centreTitre + '>Matière</th><th ' + centreTitre + '>Largeur</th><th ' + centreTitre + '>Longueur</th>' +
+    (avecCom ? '<th ' + centreTitre + '>Commentaire</th>' : '') + '</tr>' +
+    lignesBandes + '</table>' +
+    '<h3>Commentaire</h3><div style="border:1px solid #999;padding:8px;min-height:60px">' +
+    esc(d.commentaire).replace(/\n/g, '<br>') + '</div>' +
+    '<h3>Signature du client</h3>' +
+    '<div><b>Nom du signataire :</b> ' + esc(d.nomSignataire || '') + '</div>' +
+    '<img src="' + d.signature + '" style="max-height:120px;border:1px solid #999">' +
+    '<div style="margin-top:40px"><hr><table style="width:100%"><tr>' + blocsAgences + '</tr></table></div>' +
+    pagePhotosHtml_(d) +
+    '</body></html>';
+
+  return Utilities.newBlob(html, 'text/html', 'bon.html')
+    .getAs('application/pdf').setName('Bon_' + d.numero + '.pdf');
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// A lancer a la main (Executer > testerMail) : envoie un mail d'essai a EMAIL_ENTREPRISE ; le resultat s'affiche dans le journal d'execution
+function testerMail() {
+  const sujet = 'Test - bons d\'intervention';
+  const corps = 'Mail d\'essai envoye le ' + new Date().toLocaleString('fr-FR') + ' par le script des bons.';
+  if (MODE === 'graph') envoyerParGraph([EMAIL_ENTREPRISE], sujet, corps, Utilities.newBlob('test', 'text/plain', 'test.txt'));
+  else MailApp.sendEmail({ to: EMAIL_ENTREPRISE, subject: sujet, body: corps, name: NOM_ENTREPRISE, replyTo: EXPEDITEUR });
+  journalMail_(sujet, [EMAIL_ENTREPRISE], 'Essai accepté pour envoi');
+  Logger.log('Mail d\'essai envoye a ' + EMAIL_ENTREPRISE + ' (mode ' + MODE + '). Envois restants aujourd\'hui : ' + MailApp.getRemainingDailyQuota());
+}
+
+// Trace chaque envoi dans l'onglet « Journal » du Sheet (cree automatiquement) pour comprendre un mail non recu
+function journalMail_(sujet, destinataires, resultat) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sh = ss.getSheetByName('Journal');
+    if (!sh) { sh = ss.insertSheet('Journal'); sh.appendRow(['Date', 'Sujet', 'Destinataires', 'Mode', 'Résultat', 'Envois restants aujourd\'hui']); }
+    sh.appendRow([new Date(), sujet, destinataires.join(', '), MODE, resultat, MODE === 'graph' ? '' : MailApp.getRemainingDailyQuota()]);
+  } catch (e) {}
+}
+
+function envoyerMails(d, pdf) {
+  const sujet = 'Bon d\'intervention ' + d.numero + ' - ' + d.client +
+    (d.numeroCommande ? ' - Cde ' + d.numeroCommande : '');
+  const corps = 'Bonjour,\n\nVeuillez trouver ci-joint le bon d\'intervention ' +
+    d.numero + ' du ' + d.date + '.\n\nCordialement,\n' + NOM_ENTREPRISE;
+  const destinataires = [EMAIL_ENTREPRISE].concat(adressesClient_(d.emailClient)).filter(String);
+
+  try {
+    if (MODE === 'graph') {
+      envoyerParGraph(destinataires, sujet, corps, pdf);
+    } else {
+      // Depuis le Gmail du script ; les reponses du client vont a EXPEDITEUR
+      MailApp.sendEmail({
+        to: destinataires.join(','), subject: sujet, body: corps,
+        attachments: [pdf], name: NOM_ENTREPRISE, replyTo: EXPEDITEUR
+      });
+    }
+    journalMail_(sujet, destinataires, 'Accepté pour envoi');
+  } catch (e) {
+    journalMail_(sujet, destinataires, 'ÉCHEC : ' + String(e.message || e));
+    throw e;
+  }
+}
+
+// ---- Envoi depuis la boite partagee Microsoft 365 (Microsoft Graph), mode "graph" ----
+function jetonGraph() {
+  const p = PropertiesService.getScriptProperties();
+  const tenant = p.getProperty('GRAPH_TENANT_ID');
+  const id = p.getProperty('GRAPH_CLIENT_ID');
+  const secret = p.getProperty('GRAPH_CLIENT_SECRET');
+  if (!tenant || !id || !secret) {
+    throw new Error('Envoi Microsoft 365 non configuré : renseigne GRAPH_TENANT_ID, GRAPH_CLIENT_ID et GRAPH_CLIENT_SECRET dans les propriétés du script (ou repasse MODE_ENVOI sur \'gmail\').');
+  }
+  const rep = UrlFetchApp.fetch('https://login.microsoftonline.com/' + encodeURIComponent(tenant) + '/oauth2/v2.0/token', {
+    method: 'post',
+    payload: { client_id: id, client_secret: secret, scope: 'https://graph.microsoft.com/.default', grant_type: 'client_credentials' },
+    muteHttpExceptions: true
+  });
+  let j = {};
+  try { j = JSON.parse(rep.getContentText()); } catch (e) {}
+  if (rep.getResponseCode() !== 200 || !j.access_token) {
+    throw new Error('Connexion Microsoft refusée : ' + (j.error_description || j.error || rep.getResponseCode()));
+  }
+  return j.access_token;
+}
+
+// options (facultatif) : { expediteur, html, logo: { type, base64 } } ; sans options : texte brut depuis EXPEDITEUR
+function envoyerParGraph(destinataires, sujet, corps, pdf, options) {
+  options = options || {};
+  const jeton = jetonGraph();
+  const pieces = pdf ? [{
+    '@odata.type': '#microsoft.graph.fileAttachment',
+    name: pdf.getName(), contentType: 'application/pdf',
+    contentBytes: Utilities.base64Encode(pdf.getBytes())
+  }] : [];
+  if (options.logo) {
+    pieces.push({
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: 'logo.png', contentType: options.logo.type, contentBytes: options.logo.base64,
+      isInline: true, contentId: 'logo-novafit'
+    });
+  }
+  const message = {
+    subject: sujet,
+    body: options.html ? { contentType: 'HTML', content: options.html } : { contentType: 'Text', content: corps },
+    toRecipients: destinataires.map(a => ({ emailAddress: { address: a } })),
+    attachments: pieces
+  };
+  const rep = UrlFetchApp.fetch('https://graph.microsoft.com/v1.0/users/' + (options.expediteur || EXPEDITEUR) + '/sendMail', {
+    method: 'post', contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + jeton },
+    payload: JSON.stringify({ message: message, saveToSentItems: true }),
+    muteHttpExceptions: true
+  });
+  if (rep.getResponseCode() !== 202) {
+    let detail = rep.getContentText();
+    try { const e = JSON.parse(detail); detail = (e.error && (e.error.message || e.error.code)) || detail; } catch (x) {}
+    throw new Error('Envoi Microsoft refusé (' + rep.getResponseCode() + ') : ' + String(detail).slice(0, 300));
+  }
+}
+
+// =====================================================================
+// Non-conformites (gestionnaire et administrateur uniquement)
+// Un Google Sheet a part, 3 onglets. Pour ajouter/changer un champ : modifier NC_TYPES ci-dessous.
+// =====================================================================
+const NC_JOURS = 30;           // periode des indicateurs « derniers jours »
+const NC_LIGNES_MAX = 5000;    // lignes maximum lues par onglet
+// champs : cle (interne), lib (titre de colonne), type ('date' | 'texte' | 'long'), requis
+const NC_TYPES = {
+  fabrication: { lib: 'NC fabrication', onglet: 'NC Fabrication', champs: [
+    { cle: 'date', lib: 'Date de réclamation', type: 'date', requis: true },
+    { cle: 'client', lib: 'Client', type: 'texte', requis: true },
+    { cle: 'commande', lib: 'Commande', type: 'texte' },
+    { cle: 'article', lib: 'Code et Désignation article Non-conforme', type: 'texte' },
+    { cle: 'of', lib: 'OF', type: 'texte' },
+    { cle: 'nc', lib: 'Non-conformité', type: 'long', requis: true },
+    { cle: 'action', lib: 'Action', type: 'long' },
+    { cle: 'ofnc', lib: 'OF NC', type: 'texte' },
+    { cle: 'cloture', lib: 'Clôture Dossier', type: 'date' }
+  ] },
+  fournisseur: { lib: 'NC fournisseur', onglet: 'NC Fournisseur', champs: [
+    { cle: 'date', lib: 'Date de réclamation', type: 'date', requis: true },
+    { cle: 'fournisseur', lib: 'Fournisseur', type: 'texte', requis: true },
+    { cle: 'commande', lib: 'Commande', type: 'texte' },
+    { cle: 'client', lib: 'Nom Client', type: 'texte' },
+    { cle: 'article', lib: 'Code et Désignation article Non-conforme', type: 'texte' },
+    { cle: 'of', lib: 'OF', type: 'texte' },
+    { cle: 'nc', lib: 'Non-conformité', type: 'long', requis: true },
+    { cle: 'action', lib: 'Action', type: 'long' },
+    { cle: 'ofnc', lib: 'OF NC', type: 'texte' },
+    { cle: 'cloture', lib: 'Clôture Dossier', type: 'date' }
+  ] },
+  commande: { lib: 'NC commande', onglet: 'NC Magasin', champs: [
+    { cle: 'date', lib: 'Date de réclamation', type: 'date', requis: true },
+    { cle: 'client', lib: 'Client', type: 'texte', requis: true },
+    { cle: 'commande', lib: 'Commande', type: 'texte' },
+    { cle: 'article', lib: 'Code et Désignation article Non-conforme', type: 'texte' },
+    { cle: 'of', lib: 'OF', type: 'texte' },
+    { cle: 'nc', lib: 'Non-conformité', type: 'long', requis: true },
+    { cle: 'action', lib: 'Action', type: 'long' },
+    { cle: 'ofnc', lib: 'OF NC', type: 'texte' },
+    { cle: 'cloture', lib: 'Clôture Dossier', type: 'date' }
+  ] }
+};
+
+// Ouvre le Sheet des NC (constante NC_SHEET_ID, sinon propriete du script, sinon creation) et verifie les 3 onglets
+function ncClasseur_() {
+  const props = PropertiesService.getScriptProperties();
+  let id = NC_SHEET_ID || props.getProperty('NC_SHEET_ID');
+  let ss;
+  if (id) {
+    ss = SpreadsheetApp.openById(id);
+  } else {
+    ss = SpreadsheetApp.create('Non-conformités ' + NOM_ENTREPRISE);
+    props.setProperty('NC_SHEET_ID', ss.getId());
+  }
+  Object.keys(NC_TYPES).forEach(function (t) {
+    const def = NC_TYPES[t];
+    let sh = ss.getSheetByName(def.onglet);
+    if (!sh) {
+      const premier = ss.getSheets()[0];
+      const vide = ss.getSheets().length === 1 && premier.getLastRow() === 0 && !Object.keys(NC_TYPES).some(function (x) { return NC_TYPES[x].onglet === premier.getName(); });
+      if (vide) { sh = premier; sh.setName(def.onglet); } else { sh = ss.insertSheet(def.onglet); }
+      sh.getRange(1, 1, 1, def.champs.length).setValues([def.champs.map(function (f) { return f.lib; })]).setFontWeight('bold');
+      sh.setFrozenRows(1);
+    }
+  });
+  return ss;
+}
+
+function ncDate_(v) {
+  if (v instanceof Date) return isNaN(v.getTime()) ? '' : Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const s = String(v == null ? '' : v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  if (m) {
+    const a = m[3].length === 2 ? '20' + m[3] : m[3];
+    return a + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+  }
+  return '';
+}
+
+// Lit un onglet : lignes normalisees { type, ligne, <cle>: valeur }
+function ncLireOnglet_(ss, t) {
+  const def = NC_TYPES[t];
+  const sh = ss.getSheetByName(def.onglet);
+  const n = sh.getLastRow();
+  const sortie = [];
+  if (n < 2) return sortie;
+  const debut = Math.max(2, n - NC_LIGNES_MAX + 1);
+  const vals = sh.getRange(debut, 1, n - debut + 1, def.champs.length + 1).getValues();
+  vals.forEach(function (r, i) {
+    if (!r.some(function (x) { return String(x).trim() !== ''; })) return;
+    const o = { type: t, ligne: debut + i };
+    def.champs.forEach(function (f, k) {
+      o[f.cle] = f.type === 'date' ? ncDate_(r[k]) : String(r[k] == null ? '' : r[k]);
+    });
+    o.saisiPar = String(r[def.champs.length] == null ? '' : r[def.champs.length]);
+    sortie.push(o);
+  });
+  return sortie;
+}
+
+function ncSchema(jeton) {
+  droitRequis_(jeton, 'nc');
+  const types = Object.keys(NC_TYPES).map(function (t) {
+    return { id: t, lib: NC_TYPES[t].lib, champs: NC_TYPES[t].champs };
+  });
+  return { ok: true, types: types };
+}
+
+// Indicateurs : { fabrication: {total, jours}, fournisseur: {...}, commande: {...} }
+function ncStats(jeton) {
+  droitRequis_(jeton, 'nc');
+  const ss = ncClasseur_();
+  const tz = Session.getScriptTimeZone();
+  const limite = Utilities.formatDate(new Date(Date.now() - NC_JOURS * 86400000), tz, 'yyyy-MM-dd');
+  const stats = {};
+  Object.keys(NC_TYPES).forEach(function (t) {
+    const lignes = ncLireOnglet_(ss, t);
+    stats[t] = { total: lignes.length, jours: lignes.filter(function (l) { return l.date && l.date >= limite; }).length };
+  });
+  return { ok: true, stats: stats, jours: NC_JOURS };
+}
+
+// Toutes les NC (les filtres se font a l'ecran), les plus recentes d'abord
+function ncListe(jeton) {
+  droitRequis_(jeton, 'nc');
+  const ss = ncClasseur_();
+  let lignes = [];
+  Object.keys(NC_TYPES).forEach(function (t) { lignes = lignes.concat(ncLireOnglet_(ss, t)); });
+  lignes.sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : b.ligne - a.ligne); });
+  return { ok: true, lignes: lignes, jours: NC_JOURS };
+}
+
+function ncAjouter(jeton, type, valeurs, idEnvoi) {
+  const utilisateur = droitRequis_(jeton, 'nc');
+  const def = NC_TYPES[type];
+  if (!def) throw new Error('Type de non-conformité inconnu.');
+  valeurs = valeurs || {};
+  const tz = Session.getScriptTimeZone();
+  const ligne = def.champs.map(function (f) {
+    let v = String(valeurs[f.cle] == null ? '' : valeurs[f.cle]).trim().slice(0, 2000);
+    if (f.requis && !v) throw new Error('Champ obligatoire : ' + f.lib + '.');
+    if (f.type === 'date') {
+      if (!v) return '';
+      const d = ncDate_(v);
+      if (!d) throw new Error('Date invalide : ' + f.lib + '.');
+      return new Date(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), 12, 0, 0);
+    }
+    return neutraliser_(v);
+  });
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(20000);
+  try {
+    // Anti-doublon : un envoi differe rejoue apres coupure ne cree pas la ligne deux fois
+    const idc = String(idEnvoi || '').slice(0, 60);
+    const props = PropertiesService.getScriptProperties();
+    let deja = [];
+    if (idc) {
+      try { deja = JSON.parse(props.getProperty('NC_IDS') || '[]'); } catch (e) { deja = []; }
+      if (deja.indexOf(idc) >= 0) return { ok: true, doublon: true, type: type };
+    }
+    const sh = ncClasseur_().getSheetByName(def.onglet);
+    const n = Math.max(sh.getLastRow() + 1, 2);
+    sh.getRange(n, 1, 1, ligne.length).setValues([ligne]);
+    def.champs.forEach(function (f, k) { if (f.type === 'date') sh.getRange(n, k + 1).setNumberFormat('dd/MM/yyyy'); });
+    // Colonne « Saisi par » juste apres la derniere colonne de ton tableau (titre ajoute s'il est vide)
+    const cs = def.champs.length + 1;
+    if (!String(sh.getRange(1, cs).getValue()).trim()) sh.getRange(1, cs).setValue('Saisi par').setFontWeight('bold');
+    sh.getRange(n, cs).setValue(nomSaisie_(utilisateur));
+    if (idc) { deja.push(idc); props.setProperty('NC_IDS', JSON.stringify(deja.slice(-300))); }
+    return { ok: true, ligne: n, type: type };
+  } finally {
+    verrou.releaseLock();
+  }
+}
+
+
+// =====================================================================
+// Achats fournisseurs (gestionnaire et administrateur uniquement)
+// Un Google Sheet a part : onglets Commandes, Fournisseurs, Config. PDF range dans Drive, mail depuis ACHATS_EXPEDITEUR.
+// =====================================================================
+const ACHATS_LIGNES_MAX = 5000;
+const ACHATS_ENTETES = ['FOURNISSEUR', 'Date Cde', 'N° Commande', 'Description', 'MONTANT HT', 'RECUE',
+  'Destinataire', 'Total TTC', 'Saisi par', 'ID PDF', 'Mail', 'Objet', 'Message', 'ID envoi'];   // A a F = ton Excel ; G a N = suivi
+const ACHATS_TEXTE_MAIL = 'Bonjour,\n\nPour donner suite à votre devis, veuillez trouver ci-joint notre commande.\n\nCordialement,';
+
+function achatsClasseur_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = ACHATS_SHEET_ID || props.getProperty('ACHATS_SHEET_ID');
+  let ss;
+  if (id) {
+    ss = SpreadsheetApp.openById(id);
+  } else {
+    ss = SpreadsheetApp.create('Achats ' + NOM_ENTREPRISE);
+    props.setProperty('ACHATS_SHEET_ID', ss.getId());
+  }
+  const definitions = [
+    { nom: 'Commandes', entetes: ACHATS_ENTETES },
+    { nom: 'Fournisseurs', entetes: ['Fournisseur', 'Email', 'Contact'] },
+    { nom: 'Config', entetes: null }
+  ];
+  definitions.forEach(function (def) {
+    if (ss.getSheetByName(def.nom)) return;
+    const premier = ss.getSheets()[0];
+    const vide = ss.getSheets().length === 1 && premier.getLastRow() === 0 && !definitions.some(function (x) { return x.nom === premier.getName(); });
+    const sh = vide ? premier : ss.insertSheet(def.nom);
+    if (vide) sh.setName(def.nom);
+    if (def.entetes) {
+      sh.getRange(1, 1, 1, def.entetes.length).setValues([def.entetes]).setFontWeight('bold');
+      sh.setFrozenRows(1);
+    } else {
+      sh.getRange(1, 1, 2, 2).setValues([['Dernier numéro utilisé', ACHATS_PREMIER_NUMERO - 1], ['Année de ce numéro', Number(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy'))]]);
+    }
+  });
+  return ss;
+}
+
+function dossierAchats_() {
+  let f = trouverDossier_(NOM_DOSSIER_ACHATS);
+  if (f) return f;
+  let parent;
+  try { const parents = dossierEnCours().getParents(); parent = parents.hasNext() ? parents.next() : DriveApp.getRootFolder(); }
+  catch (e) { parent = DriveApp.getRootFolder(); }
+  f = parent.createFolder(NOM_DOSSIER_ACHATS);
+  PropertiesService.getScriptProperties().setProperty('ID_DOSSIER:' + NOM_DOSSIER_ACHATS, f.getId());
+  return f;
+}
+
+function nombre_(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  const n = parseFloat(String(v == null ? '' : v).replace(/[\s €]/g, '').replace(',', '.'));
+  return isFinite(n) ? n : 0;
+}
+function arrondi_(n) { return Math.round(n * 100) / 100; }
+function argent_(n) {
+  const s = arrondi_(n).toFixed(2).replace('.', ',');
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, ' ').replace(/,(\d{2})$/, ',$1') + ' €';
+}
+function dateFr_(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : String(iso || '');
+}
+function numeroAchat_(n, annee) { return ACHATS_PREFIXE + ' ' + String(annee).slice(-2) + '-' + String(n).padStart(4, '0'); }
+
+// Prochain numero : compteur de l'annee en cours (Config B1 = dernier numero, B2 = annee de ce numero).
+// Au 1er janvier, l'annee change : le compteur repart de 1 (ex : ATELIER 26-0150 puis ATELIER 27-0001).
+function prochainNumeroAchat_(cfg) {
+  const annee = Number(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy'));
+  const anneeCfg = Number(cfg.getRange('B2').getValue()) || annee;   // B2 vide : on suppose l'annee en cours
+  let dernier = anneeCfg === annee ? (Number(cfg.getRange('B1').getValue()) || (ACHATS_PREMIER_NUMERO - 1)) : 0;
+  // Securite : si une ligne a ete ajoutee a la main dans l'onglet Commandes avec un numero plus eleve, on repart de ce numero (pas de doublon)
+  try {
+    const sh = cfg.getParent().getSheetByName('Commandes');
+    const nl = sh ? sh.getLastRow() : 0;
+    if (nl >= 2) {
+      const aa = String(annee).slice(-2);
+      sh.getRange(2, 3, nl - 1, 1).getValues().forEach(function (r) {
+        const t = String(r[0]).trim();
+        let m = /^(\d+)$/.exec(t);
+        if (m) { if (anneeCfg === annee) dernier = Math.max(dernier, Number(m[1])); return; }
+        m = /(\d{2})-(\d+)$/.exec(t);
+        if (m && m[1] === aa) dernier = Math.max(dernier, Number(m[2]));
+      });
+    }
+  } catch (e) {}
+  return { n: dernier + 1, annee: annee, numero: numeroAchat_(dernier + 1, annee) };
+}
+
+function achatInit(jeton) {
+  droitRequis_(jeton, 'achats');
+  const ss = achatsClasseur_();
+  const sf = ss.getSheetByName('Fournisseurs');
+  let fournisseurs = [];
+  if (sf.getLastRow() >= 2) {
+    fournisseurs = sf.getRange(2, 1, sf.getLastRow() - 1, 3).getValues()
+      .filter(function (r) { return String(r[0]).trim() !== ''; })
+      .map(function (r) { return { nom: String(r[0]), email: String(r[1] || ''), contact: String(r[2] || '') }; });
+  }
+  const prochain = prochainNumeroAchat_(ss.getSheetByName('Config'));
+  return { ok: true, fournisseurs: fournisseurs, numero: prochain.numero, tva: 20,
+    objet: 'Commande ' + prochain.numero + ' - ' + NOM_ENTREPRISE, message: ACHATS_TEXTE_MAIL,
+    expediteur: ACHATS_EXPEDITEUR, signataire: ACHATS_SIGNATAIRE };
+}
+
+function achatListe(jeton) {
+  droitRequis_(jeton, 'achats');
+  const sh = achatsClasseur_().getSheetByName('Commandes');
+  const n = sh.getLastRow();
+  const lignes = [];
+  if (n >= 2) {
+    const debut = Math.max(2, n - ACHATS_LIGNES_MAX + 1);
+    const vals = sh.getRange(debut, 1, n - debut + 1, 11).getValues();
+    vals.forEach(function (r, i) {
+      // on ne saute que les lignes totalement vides (une ligne partiellement remplie reste visible)
+      if (r.every(function (c) { return String(c).trim() === ''; })) return;
+      lignes.push({
+        ligne: debut + i, fournisseur: String(r[0]), date: ncDate_(r[1]), numero: String(r[2]), description: String(r[3]),
+        montant: nombre_(r[4]), recue: /^(oui|o|x|1|true|vrai)$/i.test(String(r[5]).trim()),
+        destinataire: String(r[6]), ttc: nombre_(r[7]), saisiPar: String(r[8]), idPdf: String(r[9]), mail: String(r[10])
+      });
+    });
+  }
+  lignes.sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : b.ligne - a.ligne); });
+  return { ok: true, lignes: lignes };
+}
+
+// Controle et calcule une commande a partir de la saisie
+function achatNormaliser_(d) {
+  const fournisseur = String(d.fournisseur || '').trim().slice(0, 120);
+  if (!fournisseur) throw new Error('Le fournisseur est obligatoire.');
+  const destinataires = String(d.destinataire || '').split(/[;,\s]+/).map(function (s) { return s.trim(); }).filter(String);
+  if (!destinataires.length) throw new Error('Le destinataire du mail est obligatoire.');
+  destinataires.forEach(function (a) { if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a)) throw new Error('Adresse mail invalide : ' + a); });
+  const date = ncDate_(d.date);
+  if (!date) throw new Error('La date de commande est invalide.');
+  const lignes = (Array.isArray(d.lignes) ? d.lignes : []).map(function (l) {
+    return { ref: String(l.ref || '').trim().slice(0, 60), desc: String(l.desc || '').trim().slice(0, 300),
+      qte: nombre_(l.qte), pu: nombre_(l.pu) };
+  }).filter(function (l) { return l.desc !== '' || l.ref !== '' || l.pu !== 0; });
+  if (!lignes.length) throw new Error('Ajoute au moins une ligne de commande.');
+  lignes.forEach(function (l, i) {
+    if (!l.desc) throw new Error('La désignation de la ligne ' + (i + 1) + ' est obligatoire.');
+    if (!(l.qte > 0)) throw new Error('La quantité de la ligne ' + (i + 1) + ' doit être supérieure à 0.');
+    if (l.pu < 0) throw new Error('Le prix de la ligne ' + (i + 1) + ' est négatif.');
+    l.total = arrondi_(l.qte * l.pu);
+  });
+  const tauxTva = d.tva === '' || d.tva == null ? 20 : nombre_(d.tva);
+  if (tauxTva < 0 || tauxTva > 100) throw new Error('Taux de TVA invalide.');
+  const ht = arrondi_(lignes.reduce(function (s, l) { return s + l.total; }, 0));
+  const tva = arrondi_(ht * tauxTva / 100);
+  return {
+    fournisseur: fournisseur, destinataires: destinataires, date: date, lignes: lignes, tauxTva: tauxTva,
+    ht: ht, tva: tva, ttc: arrondi_(ht + tva), reglement: String(d.reglement || '').trim().slice(0, 120),
+    contact: String(d.contact || '').trim().slice(0, 120),
+    objet: String(d.objet || '').trim().slice(0, 200), message: String(d.message || '').slice(0, 4000)
+  };
+}
+
+// Mise en page du PDF de commande (tableaux et styles simples : compatibles avec le convertisseur HTML > PDF d'Apps Script)
+function htmlCommandeAchat_(c, logoDataUrl) {
+  const vert = '#0e9062', clair = '#eaf6f0', gris = '#5c6f66', ligne = '#d4ded9';
+  const logo = logoDataUrl ? '<img src="' + logoDataUrl + '" style="max-height:64px">'
+    : '<div style="font-size:20px;font-weight:bold;color:' + vert + '">' + esc(NOM_ENTREPRISE) + '</div>';
+  const th = 'style="background:' + vert + ';color:#fff;padding:8px 8px;font-size:10px;text-align:';
+  const lignes = c.lignes.map(function (l, i) {
+    const fond = i % 2 ? '#f6faf8' : '#ffffff';
+    const td = 'style="background:' + fond + ';border-bottom:1px solid ' + ligne + ';padding:8px;font-size:10.5px;vertical-align:top;';
+    return '<tr><td ' + td + '">' + esc(l.ref) + '</td><td ' + td + '">' + esc(l.desc).replace(/\n/g, '<br>') + '</td>' +
+      '<td ' + td + 'text-align:center">' + esc(String(l.qte).replace('.', ',')) + '</td>' +
+      '<td ' + td + 'text-align:right">' + argent_(l.pu) + '</td><td ' + td + 'text-align:right;font-weight:bold">' + argent_(l.total) + '</td></tr>';
+  }).join('');
+  const bloc = function (titre, contenu) {
+    return '<table style="width:100%;border-collapse:collapse;border:1px solid ' + ligne + '"><tr><td style="background:' + clair + ';color:' + vert +
+      ';font-weight:bold;font-size:10px;padding:6px 10px;border-bottom:1px solid ' + ligne + '">' + titre + '</td></tr>' +
+      '<tr><td style="padding:10px;font-size:11px;line-height:1.5;height:92px;vertical-align:top">' + contenu + '</td></tr></table>';
+  };
+  const fourn = '<b style="font-size:13px">' + esc(c.fournisseur) + '</b>' + (c.contact ? '<br>' + esc(c.contact) : '') +
+    (c.destinataires.length ? '<br><span style="color:' + gris + '">' + esc(c.destinataires.join(', ')) + '</span>' : '');
+  const livraison = '<b>NOVAFIT SARL</b><br>13 rue des Saules<br>ZA du Chapelier<br>38110 Saint-Jean-de-Soudain<br>' +
+    '<span style="color:' + gris + '">Contact : ' + esc(ACHATS_SIGNATAIRE) + ' · ' + esc(ACHATS_TEL) + '<br>' + esc(ACHATS_EXPEDITEUR) + '</span>';
+  const tot = function (lib, val, fort) {
+    return '<tr><td style="padding:6px 10px;font-size:11px;' + (fort ? 'background:' + vert + ';color:#fff;font-weight:bold;font-size:12px' : 'color:' + gris) + '">' + lib +
+      '</td><td style="padding:6px 10px;text-align:right;font-size:11px;' + (fort ? 'background:' + vert + ';color:#fff;font-weight:bold;font-size:12px' : 'font-weight:bold') + '">' + val + '</td></tr>';
+  };
+  return '<html><body style="font-family:Arial,Helvetica,sans-serif;color:#14211b;margin:0">' +
+    '<table style="width:100%"><tr><td style="vertical-align:middle;width:55%">' + logo +
+    '<div style="font-size:10px;color:' + gris + ';margin-top:8px;line-height:1.5">13 rue des Saules - ZA du Chapelier<br>38110 Saint-Jean-de-Soudain<br>' +
+    'Tél : 04 28 35 03 20 · Fax : 04 28 35 03 09<br>www.novafit.fr</div></td>' +
+    '<td style="vertical-align:top;text-align:right"><div style="font-size:30px;font-weight:bold;color:' + vert + ';letter-spacing:1px">COMMANDE</div>' +
+    '<table style="margin-left:auto;margin-top:10px;border-collapse:collapse"><tr><td style="background:' + clair + ';padding:7px 14px;font-size:11px;color:' + gris + ';border:1px solid ' + ligne + '">Numéro</td>' +
+    '<td style="padding:7px 16px;font-size:13px;font-weight:bold;border:1px solid ' + ligne + '">' + esc(c.numero) + '</td></tr>' +
+    '<tr><td style="background:' + clair + ';padding:7px 14px;font-size:11px;color:' + gris + ';border:1px solid ' + ligne + '">Date</td>' +
+    '<td style="padding:7px 16px;font-size:13px;font-weight:bold;border:1px solid ' + ligne + '">' + esc(dateFr_(c.date)) + '</td></tr></table></td></tr></table>' +
+    '<div style="height:3px;background:' + vert + ';margin:14px 0 16px"></div>' +
+    '<table style="width:100%"><tr><td style="width:49%;vertical-align:top">' + bloc('Fournisseur', fourn) + '</td><td style="width:2%"></td>' +
+    '<td style="width:49%;vertical-align:top">' + bloc('Adresse de livraison', livraison) + '</td></tr></table>' +
+    '<div style="margin:12px 0 14px;font-size:11px"><b style="color:' + vert + '">Mode de règlement :</b> ' + (c.reglement ? esc(c.reglement) : '<span style="color:' + gris + '">à définir</span>') + '</div>' +
+    '<table style="width:100%;border-collapse:collapse"><tr><th ' + th + 'left;width:18%">Référence fournisseur</th><th ' + th + 'left">Désignation</th>' +
+    '<th ' + th + 'center;width:9%">Qté</th><th ' + th + 'right;width:14%">Prix U</th><th ' + th + 'right;width:15%">Prix total</th></tr>' + lignes + '</table>' +
+    '<table style="width:46%;margin:16px 0 0 auto;border-collapse:collapse;border:1px solid ' + ligne + '">' +
+    tot('Total HT', argent_(c.ht), false) + tot('TVA ' + String(c.tauxTva).replace('.', ',') + ' %', argent_(c.tva), false) + tot('Total TTC', argent_(c.ttc), true) + '</table>' +
+    '<div style="margin-top:36px;border-top:1px solid ' + ligne + ';padding-top:8px;font-size:8.5px;color:' + gris + ';text-align:center">' +
+    'Siret : 80815008000014 · APE : 4669B · RCS : Annecy · N° TVA intracom : FR48808150080 · Capital : 100 000,00 €</div></body></html>';
+}
+
+// Mail HTML : texte saisi + signature (logo en image jointe « cid:logo-novafit »)
+function htmlMailAchat_(message, avecLogo) {
+  const vert = '#0e9062';
+  const texte = esc(message).replace(/\n/g, '<br>');
+  const logo = avecLogo ? '<img src="cid:logo-novafit" alt="Novafit" style="max-width:170px;max-height:80px">' : '<b style="font-size:18px;color:' + vert + '">' + esc(NOM_ENTREPRISE) + '</b>';
+  return '<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#222;line-height:1.5">' + texte +
+    '<table style="margin-top:18px;border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:13px;color:#222"><tr>' +
+    '<td style="padding:6px 18px 6px 0;vertical-align:middle">' + logo + '</td>' +
+    '<td style="padding:6px 18px;vertical-align:middle;text-align:center;border-left:1px solid #999;border-right:1px solid #999"><b style="font-size:14px">' + esc(ACHATS_SIGNATAIRE) + '</b><br><br>' +
+    '<a href="mailto:' + esc(ACHATS_EXPEDITEUR) + '" style="color:#1d5c8a">' + esc(ACHATS_EXPEDITEUR) + '</a><br>' + esc(ACHATS_TEL) + '</td>' +
+    '<td style="padding:6px 0 6px 18px;vertical-align:middle;text-align:center;border-right:4px solid #1b6e2b;padding-right:18px">13 Rue des Saules,<br>38110 Saint-Jean-de-Soudain<br>' + esc(ACHATS_TEL) + '<br>' +
+    '<a href="https://www.novafit.fr" style="color:#1d5c8a">www.novafit.fr</a></td></tr></table></div>';
+}
+
+function envoyerMailAchat_(destinataires, objet, message, pdf) {
+  const logo = chargerLogo();
+  const avecLogo = !!logo.dataUrl;
+  const html = htmlMailAchat_(message, avecLogo);
+  try {
+    if (MODE === 'graph') {
+      const options = { expediteur: ACHATS_EXPEDITEUR, html: html };
+      if (avecLogo) { const m = logo.dataUrl.match(/^data:([^;]+);base64,(.*)$/); options.logo = { type: m[1], base64: m[2] }; }
+      envoyerParGraph(destinataires, objet, message, pdf, options);
+    } else {
+      const options = { to: destinataires.join(','), subject: objet, body: message, htmlBody: html, attachments: [pdf], name: ACHATS_SIGNATAIRE, replyTo: ACHATS_EXPEDITEUR };
+      if (avecLogo) { options.inlineImages = { 'logo-novafit': DriveApp.getFileById(LOGO_DRIVE_ID).getBlob() }; }
+      MailApp.sendEmail(options);
+    }
+    journalMail_(objet, destinataires, 'Accepté pour envoi (achats, depuis ' + (MODE === 'graph' ? ACHATS_EXPEDITEUR : 'Gmail') + ')');
+  } catch (e) {
+    journalMail_(objet, destinataires, 'ÉCHEC (achats) : ' + String(e.message || e));
+    throw e;
+  }
+}
+
+function achatCreer(jeton, d) {
+  const utilisateur = droitRequis_(jeton, 'achats');
+  const idEnvoi = String(d.idEnvoi || '').slice(0, 60);
+  if (!idEnvoi) throw new Error('Identifiant d\'envoi manquant (recharge la page).');
+  const c = achatNormaliser_(d);
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(30000);
+  let numero, ligne, pdf, nomPdf, reservation = null;
+  try {
+    const ss = achatsClasseur_();
+    const sh = ss.getSheetByName('Commandes');
+    const n = sh.getLastRow();
+    // Anti-doublon : meme identifiant d'envoi = meme commande deja enregistree
+    if (n >= 2) {
+      const ids = sh.getRange(2, 14, n - 1, 1).getValues();
+      for (let i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === idEnvoi) {
+          const ex = sh.getRange(i + 2, 1, 1, 11).getValues()[0];
+          return { ok: true, numero: String(ex[2]), ligne: i + 2, deja: true, mail: String(ex[10]) };
+        }
+      }
+    }
+    reservation = reserverEnvoi_(utilisateur, 'achat');   // arret d'urgence et plafonds, avant toute ecriture
+    const cfg = ss.getSheetByName('Config');
+    const prochain = prochainNumeroAchat_(cfg);
+    numero = prochain.numero;
+    c.numero = numero;
+    pdf = Utilities.newBlob(htmlCommandeAchat_(c, chargerLogo().dataUrl), 'text/html', 'commande.html').getAs('application/pdf');
+    nomPdf = numero + ' - ' + c.fournisseur.replace(/[\\\/:*?"<>|]/g, ' ').trim() + '.pdf';
+    pdf.setName(nomPdf);
+    const fichier = dossierAchats_().createFile(pdf.copyBlob().setName(nomPdf));
+    const objet = c.objet || ('Commande ' + numero + ' - ' + NOM_ENTREPRISE);
+    const descr = c.lignes.map(function (l) { return l.desc + (l.qte !== 1 ? ' (x' + String(l.qte).replace('.', ',') + ')' : ''); }).join(' ; ').slice(0, 500);
+    ligne = Math.max(sh.getLastRow() + 1, 2);
+    sh.getRange(ligne, 1, 1, 14).setValues([[neutraliser_(c.fournisseur),
+      new Date(Number(c.date.slice(0, 4)), Number(c.date.slice(5, 7)) - 1, Number(c.date.slice(8, 10)), 12, 0, 0),
+      numero, neutraliser_(descr), c.ht, '', c.destinataires.join(', '), c.ttc, nomSaisie_(utilisateur), fichier.getId(),
+      'À envoyer', neutraliser_(objet), neutraliser_(c.message), idEnvoi]]);
+    sh.getRange(ligne, 2).setNumberFormat('dd/MM/yyyy');
+    sh.getRange(ligne, 5).setNumberFormat('#,##0.00 "€"');
+    sh.getRange(ligne, 8).setNumberFormat('#,##0.00 "€"');
+    cfg.getRange('B1').setValue(prochain.n);
+    cfg.getRange('B2').setValue(prochain.annee);
+    // Liste des fournisseurs : ajout (ou email complete s'il manquait)
+    const sf = ss.getSheetByName('Fournisseurs');
+    const nf = sf.getLastRow();
+    const noms = nf >= 2 ? sf.getRange(2, 1, nf - 1, 2).getValues() : [];
+    let trouve = -1;
+    for (let i = 0; i < noms.length; i++) { if (String(noms[i][0]).trim().toLowerCase() === c.fournisseur.toLowerCase()) { trouve = i; break; } }
+    if (trouve < 0) sf.getRange(nf + 1 < 2 ? 2 : nf + 1, 1, 1, 3).setValues([[neutraliser_(c.fournisseur), c.destinataires[0], c.contact]]);
+    else if (!String(noms[trouve][1]).trim()) sf.getRange(trouve + 2, 2).setValue(c.destinataires[0]);
+    c.pdfId = fichier.getId();
+    c.objetFinal = objet;
+  } catch (e) {
+    annulerEnvoi_(reservation);
+    throw e;
+  } finally {
+    verrou.releaseLock();
+  }
+  // Mail (hors verrou) : un echec n'annule pas la commande, qui reste dans la liste avec le PDF
+  let avertissement = '';
+  const sh2 = achatsClasseur_().getSheetByName('Commandes');
+  try {
+    envoyerMailAchat_(c.destinataires, c.objetFinal, c.message, pdf);
+    sh2.getRange(ligne, 11).setValue('Envoyé');
+  } catch (e) {
+    annulerEnvoi_(reservation);
+    const msg = String(e.message || e);
+    sh2.getRange(ligne, 11).setValue('Non envoyé : ' + msg.slice(0, 200));
+    avertissement = 'Commande enregistrée et PDF créé, mais le mail n\'est pas parti : ' + msg;
+  }
+  return { ok: true, numero: numero, ligne: ligne, pdfId: c.pdfId, avertissement: avertissement };
+}
+
+function achatLigneVerifiee_(sh, ligne, numero) {
+  ligne = Number(ligne);
+  if (!(ligne >= 2) || ligne > sh.getLastRow()) throw new Error('Ligne introuvable : actualise la liste.');
+  if (String(sh.getRange(ligne, 3).getValue()) !== String(numero)) throw new Error('La liste a changé : actualise-la puis recommence.');
+  return ligne;
+}
+
+function achatRecue(jeton, ligne, numero, valeur) {
+  droitRequis_(jeton, 'achats');
+  const sh = achatsClasseur_().getSheetByName('Commandes');
+  ligne = achatLigneVerifiee_(sh, ligne, numero);
+  sh.getRange(ligne, 6).setValue(valeur ? 'Oui' : '');
+  return { ok: true, recue: !!valeur };
+}
+
+function achatRenvoyer(jeton, ligne, numero) {
+  const utilisateur = droitRequis_(jeton, 'achats');
+  const sh = achatsClasseur_().getSheetByName('Commandes');
+  ligne = achatLigneVerifiee_(sh, ligne, numero);
+  const r = sh.getRange(ligne, 1, 1, 14).getValues()[0];
+  if (String(r[10]) === 'Envoyé') throw new Error('Le mail de cette commande est déjà parti.');
+  const pdfFichier = DriveApp.getFileById(String(r[9]));
+  const destinataires = String(r[6]).split(/[;,\s]+/).filter(String);
+  const reservation = reserverEnvoi_(utilisateur, 'achat');
+  try { envoyerMailAchat_(destinataires, String(r[11]), String(r[12]), pdfFichier.getBlob().setName(pdfFichier.getName())); }
+  catch (e) { annulerEnvoi_(reservation); throw e; }
+  sh.getRange(ligne, 11).setValue('Envoyé');
+  return { ok: true };
+}
+
+
+
+// =====================================================================
+// Protections d'envoi : arret d'urgence, plafond par jour, plafond par heure et par personne
+// Le journal des envois est garde dans les proprietes du script (48 h) ; l'arret d'urgence se pilote depuis la page Utilisateurs.
+// =====================================================================
+const CLE_STOP = 'ENVOIS_BLOQUES';
+const CLE_JOURNAL = 'JOURNAL_ENVOIS';
+const FUSEAU = 'Europe/Paris';
+
+function journalEnvois_() {
+  let l = [];
+  try { l = JSON.parse(PropertiesService.getScriptProperties().getProperty(CLE_JOURNAL) || '[]'); } catch (e) { l = []; }
+  const limite = Date.now() - 48 * 3600 * 1000;
+  return l.filter(function (x) { return x && x[0] > limite; });
+}
+function ecrireJournal_(l) { PropertiesService.getScriptProperties().setProperty(CLE_JOURNAL, JSON.stringify(l.slice(-400))); }
+function jourDe_(ms) { return Utilities.formatDate(new Date(ms), FUSEAU, 'yyyy-MM-dd'); }
+
+function etatStop_() {
+  let v = null;
+  try { v = JSON.parse(PropertiesService.getScriptProperties().getProperty(CLE_STOP) || 'null'); } catch (e) { v = null; }
+  return v && v.actif ? v : null;
+}
+
+// Appele juste avant un envoi : refuse (erreur code « stop » ou « limite ») ou note l'envoi dans le journal. Renvoie l'identifiant a passer a annulerEnvoi_ si l'envoi echoue.
+function reserverEnvoi_(u, type) {
+  const stop = etatStop_();
+  if (stop) throw erreurCode_('stop', 'Les envois de mails sont suspendus par l\'administrateur. Rien n\'est perdu : réessaie plus tard.');
+  const nom = nomSaisie_(u);
+  const maintenant = Date.now();
+  const journal = journalEnvois_();
+  const auj = jourDe_(maintenant);
+  const duJour = journal.filter(function (x) { return jourDe_(x[0]) === auj; });
+  if (duJour.length >= PLAFOND_JOUR) {
+    Logger.log('Plafond journalier atteint (' + PLAFOND_JOUR + ') : envoi refuse pour ' + nom);
+    throw erreurCode_('limite', 'Plafond de ' + PLAFOND_JOUR + ' envois par jour atteint pour l\'entreprise. Rien n\'est perdu : l\'envoi pourra partir demain ou après accord de l\'administrateur.');
+  }
+  const heure = journal.filter(function (x) { return x[1] === nom && x[0] > maintenant - 3600 * 1000; });
+  if (heure.length >= PLAFOND_HEURE_PERSONNE) {
+    const reprise = Math.max(1, Math.ceil((heure[0][0] + 3600 * 1000 - maintenant) / 60000));
+    Logger.log('Plafond horaire atteint (' + PLAFOND_HEURE_PERSONNE + ') : envoi refuse pour ' + nom);
+    throw erreurCode_('limite', 'Limite de ' + PLAFOND_HEURE_PERSONNE + ' envois par heure atteinte pour ton compte. Rien n\'est perdu : l\'envoi pourra partir dans environ ' + reprise + ' min.');
+  }
+  const id = maintenant + '-' + Math.floor(Math.random() * 1e6);
+  journal.push([maintenant, nom, type, id]);
+  ecrireJournal_(journal);
+  return id;
+}
+function annulerEnvoi_(id) {
+  if (!id) return;
+  try { ecrireJournal_(journalEnvois_().filter(function (x) { return x[3] !== id; })); } catch (e) {}
+}
+
+// Etat pour l'administrateur : arret d'urgence, total du jour, personnes au-dela du seuil
+function etatProtections_() {
+  const journal = journalEnvois_();
+  const auj = jourDe_(Date.now());
+  const duJour = journal.filter(function (x) { return jourDe_(x[0]) === auj; });
+  const parPersonne = {};
+  duJour.forEach(function (x) { parPersonne[x[1]] = (parPersonne[x[1]] || 0) + 1; });
+  const alertes = Object.keys(parPersonne).filter(function (n) { return parPersonne[n] > SEUIL_ALERTE_PERSONNE; })
+    .map(function (n) { return { nom: n, envois: parPersonne[n] }; })
+    .sort(function (a, b) { return b.envois - a.envois; });
+  const stop = etatStop_();
+  return { bloque: !!stop, bloquePar: stop ? stop.par : '', bloqueLe: stop ? stop.date : '',
+    jour: duJour.length, plafondJour: PLAFOND_JOUR, plafondHeure: PLAFOND_HEURE_PERSONNE, seuil: SEUIL_ALERTE_PERSONNE, alertes: alertes };
+}
+
+function usersBloquer(jeton, bloquer) {
+  const u = droitRequis_(jeton, 'admin');
+  const p = PropertiesService.getScriptProperties();
+  if (bloquer) p.setProperty(CLE_STOP, JSON.stringify({ actif: true, par: nomSaisie_(u), date: Utilities.formatDate(new Date(), FUSEAU, 'dd/MM/yyyy HH:mm') }));
+  else p.deleteProperty(CLE_STOP);
+  Logger.log('Arret d\'urgence des envois : ' + (bloquer ? 'ACTIVE' : 'leve') + ' par ' + nomSaisie_(u));
+  const r = etatProtections_(); r.ok = true; return r;
+}
+
+// =====================================================================
+// Utilisateurs, droits et appareils (administrateur)
+// Sheet « Utilisateurs Novafit » : onglet Utilisateurs (un compte par ligne, une case a cocher par droit) et onglet Appareils.
+// =====================================================================
+const USERS_ENTETES = ['Nom', 'Code', 'Actif', 'Jonction', 'Intervention', 'NC', 'Achats', 'Gestion', 'Fournisseurs', 'Admin', 'Appareils', 'Créé le', 'Bon à signer'];
+const APPAREILS_ENTETES = ['Nom', 'ID appareil', 'Appareil', 'Première connexion', 'Statut'];
+
+function booleen_(v) { return v === true || /^(true|vrai|oui|o|x|1)$/i.test(String(v).trim()); }
+
+function genererCode_(nom) {
+  const prenom = String(nom || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/\s+/)[0].replace(/[^a-z]/g, '').slice(0, 10) || 'user';
+  let chiffres = '';
+  for (let i = 0; i < 6; i++) chiffres += Math.floor(Math.random() * 10);
+  return prenom + chiffres;
+}
+
+function usersClasseur_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = USERS_SHEET_ID || props.getProperty('USERS_SHEET_ID');
+  let ss, neuf = false;
+  if (id) {
+    ss = SpreadsheetApp.openById(id);
+  } else {
+    ss = SpreadsheetApp.create('Utilisateurs ' + NOM_ENTREPRISE);
+    props.setProperty('USERS_SHEET_ID', ss.getId());
+    neuf = true;
+  }
+  [{ nom: 'Utilisateurs', entetes: USERS_ENTETES }, { nom: 'Appareils', entetes: APPAREILS_ENTETES }].forEach(function (def) {
+    if (ss.getSheetByName(def.nom)) return;
+    const premier = ss.getSheets()[0];
+    const vide = ss.getSheets().length === 1 && premier.getLastRow() === 0 && premier.getName() !== 'Utilisateurs' && premier.getName() !== 'Appareils';
+    const sh = vide ? premier : ss.insertSheet(def.nom);
+    if (vide) sh.setName(def.nom);
+    sh.getRange(1, 1, 1, def.entetes.length).setValues([def.entetes]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+    if (def.nom === 'Utilisateurs') {
+      // Premier compte : administrateur, avec un code genere (a lire dans le Sheet, puis a changer depuis l'application)
+      const ligne = ['Willy', genererCode_('Willy'), true, true, true, true, true, true, true, true, 0, new Date()];
+      sh.getRange(2, 1, 1, ligne.length).setValues([ligne]);
+      sh.getRange(2, 12).setNumberFormat('dd/MM/yyyy');
+      try { sh.getRange(2, 3, 200, 8).insertCheckboxes(); } catch (e) {}
+    }
+  });
+  return ss;
+}
+
+// A executer a la main une fois : cree le Sheet des utilisateurs (avec le premier compte administrateur)
+function initialiserUtilisateurs() {
+  const ss = usersClasseur_();
+  Logger.log('Sheet des utilisateurs : ' + ss.getUrl());
+}
+
+function usersLireTout_() {
+  const sh = usersClasseur_().getSheetByName('Utilisateurs');
+  const n = sh.getLastRow();
+  if (n < 2) return [];
+  const vals = sh.getRange(2, 1, n - 1, 13).getValues();
+  try { if (String(sh.getRange(1, 13).getValue()).trim() === '') sh.getRange(1, 13).setValue('Bon à signer').setFontWeight('bold'); } catch (e) {}
+  const out = [];
+  vals.forEach(function (r, i) {
+    const nom = String(r[0]).trim();
+    if (!nom) return;
+    const droits = [];
+    DROITS_FEUILLE.forEach(function (d, k) { if (booleen_(r[3 + k])) droits.push(d); });
+    if (booleen_(r[12])) droits.push('distance');
+    out.push({ ligne: i + 2, nom: nom, code: String(r[1]).trim(), actif: booleen_(r[2]), droits: droits, appareils: Number(r[10]) || 0 });
+  });
+  return out;
+}
+
+function usersParCode_(code) {
+  const liste = usersLireTout_();
+  for (let i = 0; i < liste.length; i++) { if (liste[i].actif && liste[i].code && liste[i].code === code) return liste[i]; }
+  return null;
+}
+
+// Enregistre l'appareil seulement s'il est nouveau pour ce compte. Le premier appareil est valide d'office,
+// les suivants apparaissent « Nouveau » (voyant orange pour l'administrateur). Jamais de blocage.
+function usersEnregistrerAppareil_(u, app) {
+  try {
+    if (!app || !/^[A-Za-z0-9-]{8,64}$/.test(String(app.id || ''))) return;
+    const verrou = LockService.getScriptLock();
+    verrou.waitLock(10000);
+    try {
+      const ss = usersClasseur_();
+      const sh = ss.getSheetByName('Appareils');
+      const n = sh.getLastRow();
+      const vals = n >= 2 ? sh.getRange(2, 1, n - 1, 5).getValues() : [];
+      let deja = 0, connu = false;
+      vals.forEach(function (r) { if (String(r[0]) === u.nom) { deja++; if (String(r[1]) === app.id) connu = true; } });
+      if (connu) return;
+      const ligne = Math.max(n + 1, 2);
+      sh.getRange(ligne, 1, 1, 5).setValues([[u.nom, app.id, neutraliser_(String(app.libelle || 'Appareil').slice(0, 80)), new Date(), deja === 0 ? 'Validé' : 'Nouveau']]);
+      sh.getRange(ligne, 4).setNumberFormat('dd/MM/yyyy HH:mm');
+      ss.getSheetByName('Utilisateurs').getRange(u.ligne, 11).setValue(deja + 1);
+    } finally {
+      verrou.releaseLock();
+    }
+  } catch (e) { /* le suivi des appareils ne doit jamais empecher la connexion */ }
+}
+
+function usersAppareilsDe_() {
+  const sh = usersClasseur_().getSheetByName('Appareils');
+  const n = sh.getLastRow();
+  const vals = n >= 2 ? sh.getRange(2, 1, n - 1, 5).getValues() : [];
+  const tz = Session.getScriptTimeZone();
+  return vals.map(function (r, i) {
+    return { ligne: i + 2, nom: String(r[0]), id: String(r[1]), libelle: String(r[2]), date: r[3] instanceof Date ? Utilities.formatDate(r[3], tz, 'yyyy-MM-dd HH:mm') : String(r[3]), statut: String(r[4]) };
+  }).filter(function (a) { return a.nom; });
+}
+
+function usersResume(jeton) {
+  droitRequis_(jeton, 'admin');
+  const actifs = usersLireTout_().filter(function (u) { return u.actif; }).length;
+  const nouveaux = usersAppareilsDe_().filter(function (a) { return a.statut === 'Nouveau'; })
+    .map(function (a) { return { nom: a.nom, libelle: a.libelle, date: a.date }; });
+  const r = etatProtections_(); r.ok = true; r.actifs = actifs; r.nouveaux = nouveaux;
+  return r;
+}
+
+function usersListe(jeton) {
+  droitRequis_(jeton, 'admin');
+  const apps = usersAppareilsDe_();
+  const p = PropertiesService.getScriptProperties();
+  return {
+    ok: true, droits: DROITS, ancien: LOGIN_ANCIEN, protections: etatProtections_(),
+    jonctionConfiguree: !!(p.getProperty('JONCTION_CODE_ACCES') && p.getProperty('JONCTION_CODE_ADMIN')),
+    users: usersLireTout_().map(function (u) {
+      return { ligne: u.ligne, nom: u.nom, code: u.code, actif: u.actif, droits: u.droits,
+        appareils: apps.filter(function (a) { return a.nom === u.nom; }) };
+    })
+  };
+}
+
+function usersValider_(d, existants, ligneCourante) {
+  const nom = String(d.nom || '').trim().slice(0, 60);
+  if (!nom) throw new Error('Le nom est obligatoire.');
+  if (/[|#]/.test(nom)) throw new Error('Le nom ne doit pas contenir « | » ni « # ».');
+  const code = String(d.code || '').trim();
+  if (code.length < 6 || /\s/.test(code)) throw new Error('Le code doit faire au moins 6 caractères, sans espace.');
+  existants.forEach(function (u) {
+    if (u.ligne === ligneCourante) return;
+    if (u.nom.toLowerCase() === nom.toLowerCase()) throw new Error('Ce nom existe déjà.');
+    if (u.code === code) throw new Error('Ce code est déjà utilisé par quelqu\'un d\'autre : choisis-en un autre.');
+  });
+  const droits = DROITS.filter(function (x) { return d.droits && booleen_(d.droits[x]); });
+  return { nom: nom, code: code, actif: booleen_(d.actif), droits: droits };
+}
+
+function usersEcrire_(sh, ligne, v) {
+  const r = [v.nom, v.code, v.actif].concat(DROITS_FEUILLE.map(function (x) { return v.droits.indexOf(x) >= 0; }));
+  sh.getRange(ligne, 1, 1, r.length).setValues([r]);
+  sh.getRange(ligne, 13).setValue(v.droits.indexOf('distance') >= 0);
+}
+
+// d : { ligne, ancienNom, nom, code, actif, droits:{jonction:true,...} }
+// Compte principal = premiere ligne de l'onglet Utilisateurs (celui cree a l'installation). Seul lui (ou l'ancien code admin)
+// peut le modifier, le desactiver ou changer son code : un autre administrateur ne peut pas t'enlever ton acces.
+function verifierComptePrincipal_(moi, cible) {
+  if (cible.ligne === 2 && moi.nom !== cible.nom && moi.nom.charAt(0) !== '#') {
+    throw new Error('Le compte principal (' + cible.nom + ') ne peut être modifié que par lui-même.');
+  }
+}
+
+function usersSauver(jeton, d) {
+  const moi = droitRequis_(jeton, 'admin');
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(20000);
+  try {
+    const liste = usersLireTout_();
+    const cible = liste.filter(function (u) { return u.ligne === Number(d.ligne) && u.nom === String(d.ancienNom); })[0];
+    if (!cible) throw new Error('Utilisateur introuvable : actualise la liste.');
+    verifierComptePrincipal_(moi, cible);
+    const v = usersValider_(d, liste, cible.ligne);
+    const reste = liste.filter(function (u) { return u.ligne !== cible.ligne && u.actif && u.droits.indexOf('admin') >= 0; }).length;
+    if (!(v.actif && v.droits.indexOf('admin') >= 0) && reste === 0) throw new Error('Il doit rester au moins un administrateur actif.');
+    const ss = usersClasseur_();
+    usersEcrire_(ss.getSheetByName('Utilisateurs'), cible.ligne, v);
+    if (v.nom !== cible.nom) {
+      const sa = ss.getSheetByName('Appareils'), n = sa.getLastRow();
+      if (n >= 2) {
+        const noms = sa.getRange(2, 1, n - 1, 1).getValues();
+        noms.forEach(function (r, i) { if (String(r[0]) === cible.nom) sa.getRange(i + 2, 1).setValue(v.nom); });
+      }
+    }
+    usersOublierCache_();
+    return { ok: true };
+  } finally {
+    verrou.releaseLock();
+  }
+}
+
+// d : { nom, droits:{...} } ; le code est genere par le script et renvoye une fois
+function usersCreer(jeton, d) {
+  droitRequis_(jeton, 'admin');
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(20000);
+  try {
+    const liste = usersLireTout_();
+    let code = '';
+    do { code = genererCode_(d.nom); } while (liste.some(function (u) { return u.code === code; }));
+    const v = usersValider_({ nom: d.nom, code: code, actif: true, droits: d.droits }, liste, 0);
+    const sh = usersClasseur_().getSheetByName('Utilisateurs');
+    const ligne = Math.max(sh.getLastRow() + 1, 2);
+    usersEcrire_(sh, ligne, v);
+    sh.getRange(ligne, 11, 1, 2).setValues([[0, new Date()]]);
+    sh.getRange(ligne, 12).setNumberFormat('dd/MM/yyyy');
+    try { sh.getRange(ligne, 3, 1, 8).insertCheckboxes(); } catch (e) {}
+    usersOublierCache_();
+    return { ok: true, code: code };
+  } finally {
+    verrou.releaseLock();
+  }
+}
+
+function usersNouveauCode(jeton, ligne, ancienNom) {
+  const moi = droitRequis_(jeton, 'admin');
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(20000);
+  try {
+    const liste = usersLireTout_();
+    const u = liste.filter(function (x) { return x.ligne === Number(ligne) && x.nom === String(ancienNom); })[0];
+    if (!u) throw new Error('Utilisateur introuvable : actualise la liste.');
+    verifierComptePrincipal_(moi, u);
+    let code = '';
+    do { code = genererCode_(u.nom); } while (liste.some(function (x) { return x.code === code; }));
+    usersClasseur_().getSheetByName('Utilisateurs').getRange(u.ligne, 2).setValue(code);
+    usersOublierCache_();
+    return { ok: true, code: code };
+  } finally {
+    verrou.releaseLock();
+  }
+}
+
+// action : 'valider' (« C'est bon ») ou 'supprimer'
+function usersAppareilAction(jeton, ligne, nom, id, action) {
+  droitRequis_(jeton, 'admin');
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(20000);
+  try {
+    const ss = usersClasseur_();
+    const sh = ss.getSheetByName('Appareils');
+    ligne = Number(ligne);
+    if (!(ligne >= 2) || ligne > sh.getLastRow()) throw new Error('Appareil introuvable : actualise la liste.');
+    const r = sh.getRange(ligne, 1, 1, 5).getValues()[0];
+    if (String(r[0]) !== String(nom) || String(r[1]) !== String(id)) throw new Error('La liste a changé : actualise-la puis recommence.');
+    if (action === 'valider') sh.getRange(ligne, 5).setValue('Validé');
+    else if (action === 'supprimer') {
+      sh.deleteRow(ligne);
+      const u = usersLireTout_().filter(function (x) { return x.nom === String(nom); })[0];
+      if (u) ss.getSheetByName('Utilisateurs').getRange(u.ligne, 11).setValue(Math.max(0, u.appareils - 1));
+    } else throw new Error('Action inconnue.');
+    return { ok: true };
+  } finally {
+    verrou.releaseLock();
+  }
+}
+
+
+// =====================================================================
+// Annuaire des fournisseurs de matieres et produits finis (droit « fournisseurs »)
+// Sheet a part « Annuaire fournisseurs Novafit », sans aucun lien avec les achats (consommables).
+// =====================================================================
+const FOUR_ENTETES = ['Fournisseur', 'Familles', 'Tags', 'Contacts', 'Téléphones', 'Emails', 'Notes'];
+// Plusieurs valeurs dans une cellule : Familles et Tags separes par « ; », Contacts / Telephones / Emails un par ligne.
+
+function annuaireClasseur_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = ANNUAIRE_SHEET_ID || props.getProperty('ANNUAIRE_SHEET_ID');
+  let ss;
+  if (id) ss = SpreadsheetApp.openById(id);
+  else { ss = SpreadsheetApp.create('Annuaire fournisseurs ' + NOM_ENTREPRISE); props.setProperty('ANNUAIRE_SHEET_ID', ss.getId()); }
+  let sh = ss.getSheetByName('Fournisseurs');
+  if (!sh) {
+    const premier = ss.getSheets()[0];
+    const vide = ss.getSheets().length === 1 && premier.getLastRow() === 0;
+    sh = vide ? premier : ss.insertSheet('Fournisseurs');
+    if (vide) sh.setName('Fournisseurs');
+    sh.getRange(1, 1, 1, FOUR_ENTETES.length).setValues([FOUR_ENTETES]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  } else if (String(sh.getRange(1, 2).getValue()).trim() === 'Métier') {
+    // Ancien modele (Fournisseur | Métier | Type | Tags | Contact | Téléphone | Email | Notes) : conversion
+    const n = sh.getLastRow();
+    const anciens = n >= 2 ? sh.getRange(2, 1, n - 1, 8).getValues() : [];
+    sh.getRange(1, 1, Math.max(n, 1), 8).clearContent();
+    sh.getRange(1, 1, 1, FOUR_ENTETES.length).setValues([FOUR_ENTETES]).setFontWeight('bold');
+    if (anciens.length) {
+      const conv = anciens.map(function (r) {
+        const tags = String(r[3]).split(/[,;\n]+/).map(function (t) { return t.trim(); }).filter(String);
+        if (String(r[2]).trim()) tags.push(String(r[2]).trim());
+        return [r[0], r[1], tags.join('; '), r[4], r[5], r[6], r[7]];
+      });
+      sh.getRange(2, 1, conv.length, FOUR_ENTETES.length).setValues(conv);
+    }
+  }
+  if (!ss.getSheetByName('Tags')) {
+    const t = ss.insertSheet('Tags');
+    t.getRange(1, 1).setValue('Tags créés à l\'avance (sans fournisseur)').setFontWeight('bold');
+  }
+  return ss;
+}
+
+function fourListeSeparee_(v, sep) {
+  return String(v == null ? '' : v).split(sep).map(function (x) { return x.trim(); }).filter(String);
+}
+function fourLire_() {
+  const ss = annuaireClasseur_();
+  const sh = ss.getSheetByName('Fournisseurs');
+  const n = sh.getLastRow();
+  const lignes = [];
+  if (n >= 2) {
+    sh.getRange(2, 1, n - 1, 7).getValues().forEach(function (r, i) {
+      if (!String(r[0]).trim()) return;
+      lignes.push({ ligne: i + 2, nom: String(r[0]).trim(), familles: fourListeSeparee_(r[1], /[;\n]+/), tags: fourListeSeparee_(r[2], /[;\n]+/),
+        contacts: fourListeSeparee_(r[3], /\n+/), tels: fourListeSeparee_(r[4], /\n+/), mails: fourListeSeparee_(r[5], /\n+/), notes: String(r[6]).trim() });
+    });
+  }
+  const st = ss.getSheetByName('Tags');
+  const nt = st.getLastRow();
+  const tagsLibres = nt >= 2 ? st.getRange(2, 1, nt - 1, 1).getValues().map(function (r) { return String(r[0]).trim(); }).filter(String) : [];
+  return { lignes: lignes, tagsLibres: tagsLibres };
+}
+
+function fourListe(jeton) {
+  droitRequis_(jeton, 'fournisseurs');
+  const r = fourLire_();
+  return { ok: true, lignes: r.lignes, tagsLibres: r.tagsLibres };
+}
+
+function fourListeTexte_(v, max, n) {
+  return (Array.isArray(v) ? v : fourListeSeparee_(v, /[;\n,]+/)).map(function (x) { return String(x).trim().slice(0, max); }).filter(String).slice(0, n);
+}
+
+// d : { ligne (0 = nouveau), ancienNom, nom, familles[], tags[], contacts[], tels[], mails[], notes }
+function fourSauver(jeton, d) {
+  droitRequis_(jeton, 'fournisseurs');
+  const nom = String(d.nom || '').trim().slice(0, 120);
+  if (!nom) throw new Error('Le nom du fournisseur est obligatoire.');
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(20000);
+  try {
+    const sh = annuaireClasseur_().getSheetByName('Fournisseurs');
+    const n = sh.getLastRow();
+    const noms = n >= 2 ? sh.getRange(2, 1, n - 1, 1).getValues() : [];
+    const ligne0 = Number(d.ligne) || 0;
+    if (ligne0 && String(sh.getRange(ligne0, 1).getValue()).trim() !== String(d.ancienNom || '').trim()) throw new Error('Fournisseur introuvable ou déjà modifié : actualise la liste.');
+    if (noms.some(function (r, i) { return i + 2 !== ligne0 && String(r[0]).trim().toLowerCase() === nom.toLowerCase(); })) throw new Error('Ce fournisseur existe déjà dans l\'annuaire.');
+    const f = function (v, max, k) { return fourListeTexte_(v, max, k).map(neutraliser_); };
+    const ligne = ligne0 || Math.max(n + 1, 2);
+    sh.getRange(ligne, 1, 1, 7).setValues([[neutraliser_(nom), f(d.familles, 60, 10).join('; '), f(d.tags, 60, 30).join('; '),
+      f(d.contacts, 120, 10).join('\n'), f(d.tels, 40, 10).join('\n'), f(d.mails, 120, 10).join('\n'), neutraliser_(String(d.notes || '').trim().slice(0, 1000))]]);
+    return { ok: true, ligne: ligne };
+  } finally {
+    verrou.releaseLock();
+  }
+}
+function fourAjouter(jeton, d) { return fourSauver(jeton, Object.assign({}, d, { ligne: 0 })); }
+
+function fourSupprimer(jeton, ligne, nom) {
+  droitRequis_(jeton, 'admin');
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(20000);
+  try {
+    const sh = annuaireClasseur_().getSheetByName('Fournisseurs');
+    const l = Number(ligne);
+    if (!l || l < 2 || String(sh.getRange(l, 1).getValue()).trim() !== String(nom || '').trim()) throw new Error('Fournisseur introuvable : actualise la liste.');
+    sh.deleteRow(l);
+    return { ok: true };
+  } finally {
+    verrou.releaseLock();
+  }
+}
+
+// Cree un tag a l'avance (sans fournisseur)
+function fourTagAjouter(jeton, tag) {
+  droitRequis_(jeton, 'fournisseurs');
+  const t = neutraliser_(String(tag || '').trim().slice(0, 60));
+  if (!t) throw new Error('Tag vide.');
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(20000);
+  try {
+    const st = annuaireClasseur_().getSheetByName('Tags');
+    const n = st.getLastRow();
+    const deja = n >= 2 ? st.getRange(2, 1, n - 1, 1).getValues().map(function (r) { return String(r[0]).trim().toLowerCase(); }) : [];
+    if (deja.indexOf(t.toLowerCase()) < 0) st.getRange(Math.max(n + 1, 2), 1).setValue(t);
+    return { ok: true };
+  } finally {
+    verrou.releaseLock();
+  }
+}
+
+// Renomme ou fusionne un tag partout (administrateur)
+function fourTagRenommer(jeton, ancien, nouveau) {
+  droitRequis_(jeton, 'admin');
+  const a = String(ancien || '').trim(), b = neutraliser_(String(nouveau || '').trim().slice(0, 60));
+  if (!a || !b) throw new Error('Tag vide.');
+  const verrou = LockService.getScriptLock();
+  verrou.waitLock(20000);
+  try {
+    const ss = annuaireClasseur_();
+    const sh = ss.getSheetByName('Fournisseurs');
+    const n = sh.getLastRow();
+    let touches = 0;
+    if (n >= 2) {
+      const plage = sh.getRange(2, 3, n - 1, 1);
+      const vals = plage.getValues().map(function (r) {
+        const l = fourListeSeparee_(r[0], /[;\n]+/);
+        if (!l.some(function (t) { return t.toLowerCase() === a.toLowerCase(); })) return [r[0]];
+        touches++;
+        const out = [];
+        l.forEach(function (t) { const x = t.toLowerCase() === a.toLowerCase() ? b : t; if (!out.some(function (o) { return o.toLowerCase() === x.toLowerCase(); })) out.push(x); });
+        return [out.join('; ')];
+      });
+      plage.setValues(vals);
+    }
+    const st = ss.getSheetByName('Tags'), nt = st.getLastRow();
+    if (nt >= 2) {
+      const pl = st.getRange(2, 1, nt - 1, 1), v = pl.getValues().map(function (r) { return [String(r[0]).trim().toLowerCase() === a.toLowerCase() ? b : r[0]]; });
+      pl.setValues(v);
+    }
+    return { ok: true, fournisseurs: touches };
+  } finally {
+    verrou.releaseLock();
+  }
+}
+
+
+// =====================================================================
+// Apercu d'une commande d'achat (PDF sans rien enregistrer, ni numero consomme, ni mail)
+// =====================================================================
+function achatApercu(jeton, d) {
+  droitRequis_(jeton, 'achats');
+  const c = achatNormaliser_(d);
+  const cfg = achatsClasseur_().getSheetByName('Config');
+  c.numero = prochainNumeroAchat_(cfg).numero;
+  const pdf = Utilities.newBlob(htmlCommandeAchat_(c, chargerLogo().dataUrl), 'text/html', 'commande.html').getAs('application/pdf');
+  return { ok: true, numero: c.numero, donnees: Utilities.base64Encode(pdf.getBytes()), ht: c.ht, ttc: c.ttc };
+}
+
+// =====================================================================
+// Bon a signer a distance (droit « distance »)
+// 1. Le technicien prepare le bon sans signature : le numero est pris tout de suite (comme un envoi normal) et le client recoit un lien.
+// 2. Le client ouvre le lien (page signer.html, sans compte), voit le bon, signe et valide.
+// 3. A la signature : PDF signe, mail au client + copie Novafit, bon ecrit dans l'onglet Bons, commande deplacee.
+// Etat de chaque bon : onglet Config, colonnes D idEnvoi | E numero | F statut (asigner, ecrit, mail, envoye, annule) |
+//   G lien secret | H expiration | I fichier Drive du bon | J client | K cree par | L lien envoye le | M signe le | N emails | O adresse de la page
+// =====================================================================
+function distanceDossier_() {
+  let f = trouverDossier_(NOM_DOSSIER_ASIGNER);
+  if (f) return f;
+  const parents = dossierBons().getParents();
+  const parent = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+  f = parent.createFolder(NOM_DOSSIER_ASIGNER);
+  PropertiesService.getScriptProperties().setProperty('ID_DOSSIER:' + NOM_DOSSIER_ASIGNER, f.getId());
+  return f;
+}
+
+function distanceAdresseValide_(u) {
+  if (URL_SIGNATURE) u = URL_SIGNATURE;   // adresse fixe reglee en haut du fichier : prioritaire
+  u = String(u || '').trim();
+  return /^https:\/\/[^\s"'<>]+\/signer\.html$/.test(u) ? u : '';
+}
+
+function distanceNouveauLien_() {
+  return (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '').slice(0, 48);
+}
+
+// Ligne de l'onglet Config correspondant a un lien (token) ou a un numero ; null si introuvable
+function distanceLigne_(cle, parNumero) {
+  if (!cle || String(cle).length < 6) return null;
+  const cfg = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config');
+  const n = cfg.getLastRow();
+  if (n < 2) return null;
+  const vals = cfg.getRange(2, 4, n - 1, 12).getValues();   // colonnes D a O
+  for (let i = vals.length - 1; i >= 0; i--) {
+    const r = vals[i];
+    if (!String(r[3]).trim()) continue;   // pas un bon a distance
+    if (String(parNumero ? r[1] : r[3]) === String(cle)) {
+      return { ligne: i + 2, idEnvoi: String(r[0]), numero: String(r[1]), statut: String(r[2]), token: String(r[3]), expire: r[4], fichierId: String(r[5]),
+        client: String(r[6]), creePar: String(r[7]), envoyeLe: r[8], signeLe: r[9], emails: String(r[10]), urlSigner: String(r[11]) };
+    }
+  }
+  return null;
+}
+
+function distanceExpire_(l) {
+  return l.statut === 'asigner' && l.expire instanceof Date && l.expire.getTime() < Date.now();
+}
+
+function distanceMailLien_(l, expire) {
+  const dest = adressesClient_(l.emails);
+  if (!dest.length) throw new Error('Aucune adresse email valide pour le client.');
+  const lien = l.urlSigner + '?t=' + l.token;
+  const jusqu = Utilities.formatDate(expire, FUSEAU, 'dd/MM/yyyy');
+  const sujet = 'Bon d\'intervention ' + l.numero + ' à signer - ' + l.client;
+  const corps = 'Bonjour,\n\nSuite à notre intervention, merci de consulter et de signer le bon d\'intervention ' + l.numero + ' en ouvrant ce lien :\n\n' + lien +
+    '\n\nVous n\'avez qu\'à vérifier le bon, signer avec le doigt ou la souris, puis cliquer sur « Valider ». Vous recevrez ensuite le bon signé par email.\n' +
+    'Ce lien est personnel et valable jusqu\'au ' + jusqu + '.\n\nCordialement,\n' + NOM_ENTREPRISE;
+  try {
+    if (MODE === 'graph') envoyerParGraph(dest, sujet, corps, null);
+    else MailApp.sendEmail({ to: dest.join(','), subject: sujet, body: corps, name: NOM_ENTREPRISE, replyTo: EXPEDITEUR });
+    journalMail_(sujet, dest, 'Lien de signature accepté pour envoi');
+  } catch (e) {
+    journalMail_(sujet, dest, 'ÉCHEC lien de signature : ' + String(e.message || e));
+    throw e;
+  }
+}
+
+function distanceCreer(jeton, d) {
+  const utilisateur = droitRequis_(jeton, 'distance');
+  const idEnvoi = String(d.idEnvoi || '').slice(0, 60);
+  if (!idEnvoi) throw new Error('Identifiant d\'envoi manquant (recharge la page).');
+  const adr = adressesClient_(d.emailClient);
+  if (!adr.length) throw new Error('Adresse email du client invalide : vérifie-la (plusieurs adresses possibles, séparées par une virgule ou un point-virgule).');
+  if (!String(d.client || '').trim() || !String(d.technicien || '').trim()) throw new Error('Client et technicien sont obligatoires.');
+  if (!Array.isArray(d.bandes) || !d.bandes.length) throw new Error('Le bon ne contient aucune bande : ajoutes-en une avant de valider.');
+  const urlSigner = distanceAdresseValide_(d.urlSigner);
+  if (!urlSigner) throw new Error('Adresse de la page de signature inconnue : recharge l\'application et recommence.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  let reservation = null;
+  try {
+    const dejaEnvoi = trouverEnvoi(idEnvoi);
+    let l;
+    let envoyerLien = true;
+    if (dejaEnvoi) {
+      l = distanceLigne_(dejaEnvoi.numero, true);
+      if (!l) throw new Error('Cet envoi existe déjà sous un autre type de bon.');
+      envoyerLien = !l.envoyeLe;   // deja enregistre ET lien deja parti : rien a refaire
+      if (!envoyerLien) return { ok: true, numero: l.numero, deja: true };
+      reservation = reserverEnvoi_(utilisateur, 'distance');   // le lien n'etait pas parti : on le renvoie
+    } else {
+      reservation = reserverEnvoi_(utilisateur, 'distance');   // arret d'urgence et plafonds, avant toute ecriture
+      const cfg = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config');
+      const pris = prendreNumeroBon_();   // numero reserve des l'envoi du lien
+      let fichier = null;
+      try {
+        const bon = {
+          idEnvoi: idEnvoi, numero: pris.numero, date: String(d.date || ''), client: String(d.client).trim(), technicien: String(d.technicien).trim(),
+          emailClient: adr.join('; '), bandes: d.bandes.slice(0, 60).map(function (b) { return { matiere: String(b.matiere || ''), largeur: String(b.largeur || ''), longueur: String(b.longueur || ''), commentaire: String(b.commentaire || '') }; }),
+          numeroCommande: String(d.numeroCommande || ''), commentaire: String(d.commentaire || ''), heureArrivee: String(d.heureArrivee || ''), heureFin: String(d.heureFin || ''),
+          photos: photosValides_(d), docId: String(d.docId || ''), nomSignataire: String(d.nomSignataire || '').slice(0, 80), creePar: nomSaisie_(utilisateur)
+        };
+        const texte = JSON.stringify(bon);
+        if (texte.length > 9000000) throw new Error('Le bon est trop volumineux (photos) : retire une photo.');
+        fichier = distanceDossier_().createFile(pris.numero + ' - ' + bon.client.replace(/[\\\/:*?"<>|]/g, ' ').trim() + '.json', texte, 'application/json');
+        const token = distanceNouveauLien_();
+        const expire = new Date(Date.now() + DISTANCE_JOURS * 86400000);
+        const ligne = Math.max(cfg.getLastRow() + 1, 2);
+        cfg.getRange(ligne, 4, 1, 12).setValues([[idEnvoi, pris.numero, 'asigner', token, expire, fichier.getId(), neutraliser_(bon.client), neutraliser_(bon.creePar), '', '', adr.join('; '), urlSigner]]);
+        cfg.getRange(ligne, 8, 1, 1).setNumberFormat('dd/MM/yyyy HH:mm');
+        try { if (!String(cfg.getRange(1, 7).getValue()).trim()) cfg.getRange(1, 7, 1, 9).setValues([['Lien secret', 'Expire le', 'Fichier du bon', 'Client', 'Créé par', 'Lien envoyé le', 'Signé le', 'Emails', 'Page de signature']]); } catch (x) {}
+        l = distanceLigne_(token, false);
+      } catch (e) {
+        try { cfg.getRange('B1').setValue(pris.avant); } catch (x) {}
+        try { if (fichier) fichier.setTrashed(true); } catch (x) {}
+        throw e;
+      }
+    }
+    // Mail du lien : un echec n'annule pas le bon (numero et bon restent), il pourra etre renvoye depuis la liste
+    let avertissement = '';
+    try {
+      distanceMailLien_(l, l.expire);
+      SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config').getRange(l.ligne, 12).setValue(new Date()).setNumberFormat('dd/MM/yyyy HH:mm');
+    } catch (e) {
+      annulerEnvoi_(reservation);
+      avertissement = 'Bon enregistré (n° ' + l.numero + ') mais le lien n\'est pas parti : ' + String(e.message || e) + ' Renvoie-le depuis « Bons à signer ».';
+    }
+    return { ok: true, numero: l.numero, avertissement: avertissement };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---- Page publique du client ----
+function distanceLire(token) {
+  const l = distanceLigne_(token, false);
+  if (!l) throw erreurCode_('invalide', 'Ce lien n\'est pas valide. Vérifiez que vous avez copié le lien en entier.');
+  if (l.statut === 'annule') throw erreurCode_('annule', 'Ce bon a été annulé par ' + NOM_ENTREPRISE + '. Contactez-nous si besoin.');
+  if (l.statut === 'mail' || l.statut === 'envoye') throw erreurCode_('signe', 'Ce bon a déjà été signé. Vous l\'avez reçu par email.');
+  if (distanceExpire_(l)) throw erreurCode_('expire', 'Ce lien a expiré. Contactez ' + NOM_ENTREPRISE + ' pour recevoir un nouveau lien.');
+  const bon = distanceBon_(l);
+  return { ok: true, numero: l.numero, client: bon.client, date: bon.date, technicien: bon.technicien, heureArrivee: bon.heureArrivee, heureFin: bon.heureFin,
+    numeroCommande: bon.numeroCommande, commentaire: bon.commentaire, bandes: bon.bandes, photos: photosValides_(bon), nomSignataire: bon.nomSignataire || '' };
+}
+
+function distanceBon_(l) {
+  try { return JSON.parse(DriveApp.getFileById(l.fichierId).getBlob().getDataAsString('UTF-8')); }
+  catch (e) { throw erreurCode_('indisponible', 'Le bon est momentanément indisponible. Réessayez dans quelques minutes.'); }
+}
+
+function distanceSigner(token, nom, signature) {
+  nom = String(nom || '').trim().slice(0, 80);
+  if (nom.length < 2) throw new Error('Indiquez votre nom et prénom.');
+  if (typeof signature !== 'string' || !/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/.test(signature) || signature.length > 600000) throw new Error('Signature invalide : signez dans le cadre puis réessayez.');
+  if (etatStop_()) throw erreurCode_('stop', 'L\'envoi des bons est momentanément suspendu. Réessayez dans quelques heures : votre signature n\'est pas perdue tant que le lien est valable.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    const l = distanceLigne_(token, false);
+    if (!l) throw erreurCode_('invalide', 'Ce lien n\'est pas valide.');
+    if (l.statut === 'annule') throw erreurCode_('annule', 'Ce bon a été annulé par ' + NOM_ENTREPRISE + '.');
+    if (l.statut === 'mail' || l.statut === 'envoye') return { ok: true, numero: l.numero, deja: true };
+    if (distanceExpire_(l)) throw erreurCode_('expire', 'Ce lien a expiré. Contactez ' + NOM_ENTREPRISE + ' pour recevoir un nouveau lien.');
+    const d = distanceBon_(l);
+    d.nomSignataire = nom;
+    d.signature = signature;
+    d.numero = l.numero;
+    d.idEnvoi = l.idEnvoi;
+    const cfg = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config');
+    if (l.statut === 'asigner') {
+      ecrireDansSheet(d);              // le bon entre dans l'onglet Bons au moment de la signature
+      marquerStatut(l.idEnvoi, 'ecrit');
+      cfg.getRange(l.ligne, 13).setValue(new Date()).setNumberFormat('dd/MM/yyyy HH:mm');
+    }
+    const pdf = genererPdf(d);
+    const avertPdf = sauverPdfBon_(d, pdf);
+    envoyerMails(d, pdf);              // client + copie Novafit ; en cas d'echec le statut reste « ecrit » : le client peut recommencer
+    marquerStatut(l.idEnvoi, 'mail');
+    const avert = [avertPdf, d.docId ? deplacerCommande(d.docId) : ''].filter(String).join(' ');
+    marquerStatut(l.idEnvoi, 'envoye');
+    try { DriveApp.getFileById(l.fichierId).setTrashed(true); } catch (e) {}   // les photos ne restent pas dans le dossier d'attente
+    if (avert) Logger.log('Bon ' + l.numero + ' signe : ' + avert);
+    return { ok: true, numero: l.numero };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---- Cote technicien ----
+function distanceStatut_(l) {
+  if (l.statut === 'annule') return 'annule';
+  if (l.statut === 'mail' || l.statut === 'envoye') return 'signe';
+  if (distanceExpire_(l)) return 'expire';
+  return 'attente';
+}
+
+function distanceLignes_() {
+  const cfg = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config');
+  const n = cfg.getLastRow();
+  if (n < 2) return [];
+  const vals = cfg.getRange(2, 4, n - 1, 12).getValues();
+  const out = [];
+  vals.forEach(function (r, i) {
+    if (!String(r[3]).trim()) return;
+    out.push({ ligne: i + 2, idEnvoi: String(r[0]), numero: String(r[1]), statut: String(r[2]), token: String(r[3]), expire: r[4], fichierId: String(r[5]),
+      client: String(r[6]), creePar: String(r[7]), envoyeLe: r[8], signeLe: r[9], emails: String(r[10]), urlSigner: String(r[11]) });
+  });
+  return out;
+}
+
+function distanceListe(jeton) {
+  droitRequis_(jeton, 'distance');
+  const maintenant = Date.now();
+  const liste = distanceLignes_().map(function (l) {
+    const etat = distanceStatut_(l);
+    const depuis = l.envoyeLe instanceof Date ? l.envoyeLe.getTime() : 0;
+    return { numero: l.numero, client: l.client, etat: etat, creePar: l.creePar, emails: l.emails,
+      envoyeLe: depuis ? Utilities.formatDate(l.envoyeLe, FUSEAU, 'dd/MM/yyyy HH:mm') : '',
+      signeLe: l.signeLe instanceof Date ? Utilities.formatDate(l.signeLe, FUSEAU, 'dd/MM/yyyy HH:mm') : '',
+      expireLe: l.expire instanceof Date ? Utilities.formatDate(l.expire, FUSEAU, 'dd/MM/yyyy') : '',
+      jours: depuis ? Math.floor((maintenant - depuis) / 86400000) : 0, lienParti: !!depuis,
+      relance: etat === 'attente' && depuis && maintenant - depuis > DISTANCE_RAPPEL_JOURS * 86400000 };
+  }).reverse().slice(0, 80);
+  return { ok: true, bons: liste, rappelJours: DISTANCE_RAPPEL_JOURS, validiteJours: DISTANCE_JOURS };
+}
+
+function distanceResume(jeton) {
+  droitRequis_(jeton, 'distance');
+  const maintenant = Date.now();
+  let attente = 0, relance = 0;
+  distanceLignes_().forEach(function (l) {
+    const e = distanceStatut_(l);
+    if (e !== 'attente' && e !== 'expire') return;
+    attente++;
+    const depuis = l.envoyeLe instanceof Date ? l.envoyeLe.getTime() : 0;
+    if (e === 'expire' || (depuis && maintenant - depuis > DISTANCE_RAPPEL_JOURS * 86400000)) relance++;
+  });
+  return { ok: true, attente: attente, relance: relance };
+}
+
+function distanceRenvoyer(jeton, numero, urlSigner) {
+  const utilisateur = droitRequis_(jeton, 'distance');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  let reservation = null;
+  try {
+    const l = distanceLigne_(numero, true);
+    if (!l) throw new Error('Bon introuvable.');
+    const etat = distanceStatut_(l);
+    if (etat === 'signe') throw new Error('Ce bon est déjà signé.');
+    if (etat === 'annule') throw new Error('Ce bon a été annulé.');
+    const adresse = distanceAdresseValide_(urlSigner) || l.urlSigner;
+    if (!adresse) throw new Error('Adresse de la page de signature inconnue.');
+    reservation = reserverEnvoi_(utilisateur, 'distance');
+    const cfg = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config');
+    const expire = new Date(Date.now() + DISTANCE_JOURS * 86400000);
+    l.urlSigner = adresse;
+    try {
+      distanceMailLien_(l, expire);
+    } catch (e) { annulerEnvoi_(reservation); throw e; }
+    cfg.getRange(l.ligne, 8).setValue(expire).setNumberFormat('dd/MM/yyyy HH:mm');
+    cfg.getRange(l.ligne, 12).setValue(new Date()).setNumberFormat('dd/MM/yyyy HH:mm');
+    cfg.getRange(l.ligne, 15).setValue(adresse);
+    return { ok: true, numero: l.numero };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function distanceAnnuler(jeton, numero) {
+  droitRequis_(jeton, 'distance');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    const l = distanceLigne_(numero, true);
+    if (!l) throw new Error('Bon introuvable.');
+    if (distanceStatut_(l) === 'signe') throw new Error('Ce bon est déjà signé : impossible de l\'annuler.');
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config').getRange(l.ligne, 6).setValue('annule');   // le numero reste attribue
+    try { DriveApp.getFileById(l.fichierId).setTrashed(true); } catch (e) {}
+    return { ok: true, numero: l.numero };
+  } finally {
+    lock.releaseLock();
+  }
+}

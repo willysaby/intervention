@@ -103,6 +103,7 @@
       <h2>Intervention</h2>
       <a class="gros" id="btnInter" href="commandes.html"><div class="pic" id="icInter"></div><div class="tx"><b>Bon d'intervention</b><span id="txtInter">Vierge ou depuis une commande</span></div><span class="pastille" id="pastilleCmd" hidden></span></a>
       <div id="panneauAtt" class="panneauAtt" hidden></div>
+      <a class="gros" id="btnDist" href="distance.html" hidden><div class="pic" id="icDist"></div><div class="tx"><b>Bon à signer à distance</b><span id="txtDist">Le client signe en ligne</span></div><span class="fl" id="flDist"></span></a>
       <div class="grille" id="indicateurs"></div>
       <div class="grille" id="modules_inter"></div>
     </section>
@@ -199,7 +200,7 @@ function partagerAvecJonction(j) {
 }
 function oublierJonction() {
   try {
-    ['code', 'admin', 'cache', 'commandesCache', 'termineCache', 'ncCache', 'ncSchemaCache', 'achatsCache', 'achatInitCache', 'achatsCompte_' + new Date().getFullYear()].forEach(k => localStorage.removeItem(k));
+    ['code', 'admin', 'cache', 'commandesCache', 'termineCache', 'ncCache', 'ncSchemaCache', 'achatsCache', 'distanceResume', 'achatInitCache', 'achatsCompte_' + new Date().getFullYear()].forEach(k => localStorage.removeItem(k));
   } catch (e) {}
 }
 
@@ -260,7 +261,10 @@ function dessiner() {
   const modulesVisibles = MODULES.filter(m => peut(m.droit));
   const aGroupe = g => modulesVisibles.some(m => m.groupe === g);
   document.getElementById('secJonc').hidden = !peut('jonction');
-  document.getElementById('secInter').hidden = !(peut('intervention') || aGroupe('inter'));
+  document.getElementById('secInter').hidden = !(peut('intervention') || peut('distance') || aGroupe('inter'));
+  document.getElementById('btnDist').hidden = !peut('distance');
+  document.getElementById('icDist').innerHTML = Shell.svg('pen', 30);
+  document.getElementById('flDist').innerHTML = Shell.svg('chevron', 24);
   document.getElementById('btnInter').hidden = !peut('intervention');
   document.getElementById('icJonc').innerHTML = Shell.svg('sliders', 30);
   document.getElementById('flJonc').innerHTML = Shell.svg('chevron', 24);
@@ -281,7 +285,7 @@ function dessiner() {
     a.querySelector('.d').textContent = m.description;
     document.getElementById({ nc: 'gridNc', achats: 'gridAch', four: 'gridFour' }[m.groupe] || 'modules_inter').appendChild(a);
   });
-  if (niveau) chargerIndicateurs(); else { retirerCartesNc(); retirerCarteAchats(); retirerCarteUsers(); }
+  if (niveau) { chargerIndicateurs(); majDistance(); chargerDistance(); } else { retirerCartesNc(); retirerCarteAchats(); retirerCarteUsers(); }
 }
 
 /* ---------- Indicateurs ---------- */
@@ -300,7 +304,29 @@ function lireAttente() {
   try { return JSON.parse(localStorage.getItem('bonsEnAttente')) || []; } catch (e) { return []; }
 }
 let envoiEnCours = false, messageAtt = '', panneauOuvert = false;
-function nbAttente() { return lireAttente().length + Nova.lireFile().length; }
+function nbAttente() { return lireAttente().length + Nova.lireFile().filter(x => x.action !== 'distanceCreer').length; }
+
+/* ---------- Bons à signer à distance : bouton jaune tant qu'un bon n'est pas revenu signé ---------- */
+function majDistance() {
+  const btn = document.getElementById('btnDist');
+  if (!btn || btn.hidden) return;
+  let m = { attente: 0, relance: 0 };
+  try { m = JSON.parse(localStorage.getItem('distanceResume')) || m; } catch (e) {}
+  const file = Nova.lireFile().filter(x => x.action === 'distanceCreer').length;
+  btn.classList.toggle('attente', m.attente + file > 0);
+  const parts = [];
+  if (file) parts.push(file + (file > 1 ? ' bons à envoyer' : ' bon à envoyer'));
+  if (m.attente) parts.push(m.attente + (m.attente > 1 ? ' en attente de signature' : ' en attente de signature') + (m.relance ? ' · ' + m.relance + ' à relancer' : ''));
+  document.getElementById('txtDist').textContent = parts.length ? parts.join(' · ') : 'Le client signe en ligne';
+}
+async function chargerDistance() {
+  if (!peut('distance') || !navigator.onLine) return;
+  try {
+    const r = await Nova.api('distanceResume', null, 10000);
+    localStorage.setItem('distanceResume', JSON.stringify({ attente: r.attente, relance: r.relance }));
+    majDistance();
+  } catch (e) {}
+}
 function majAttente(message) {
   if (message !== undefined) messageAtt = message;
   const n = nbAttente();
@@ -332,7 +358,7 @@ function majAttente(message) {
 document.getElementById('btnInter').addEventListener('click', e => {
   if (nbAttente() > 0 && !panneauOuvert) { e.preventDefault(); panneauOuvert = true; majAttente(); }
 });
-document.addEventListener('nova:file', () => majAttente());
+document.addEventListener('nova:file', () => { majAttente(); majDistance(); chargerDistance(); });
 async function envoyerTout() {
   if (envoiEnCours) return;
   if (!navigator.onLine) { majAttente('Hors ligne : les envois restent sur l\'appareil.'); return; }
