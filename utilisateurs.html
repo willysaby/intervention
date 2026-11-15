@@ -118,6 +118,15 @@
         <button type="button" class="btnP" id="bCopier">Copier</button>
         <button type="button" class="btnP" id="bNeuf">Nouveau code</button>
       </div>
+      <div id="codeLecture"><button type="button" class="btnP" id="bModif" style="width:100%;margin-top:8px">Modifier le code à la main</button></div>
+      <div id="codeEdit" hidden style="margin-top:10px">
+        <label class="l" for="eCode">Nouveau code (6 caractères minimum, sans espace)</label>
+        <input class="champ" id="eCode" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <div class="trois" style="grid-template-columns:1fr 1fr">
+          <button type="button" class="btnP" id="bCodeAnnul">Annuler</button>
+          <button type="button" class="btnP" id="bCodeSauver" style="font-weight:800">Enregistrer le code</button>
+        </div>
+      </div>
     </div>
     <div class="sec">
       <h4>Droits</h4>
@@ -191,6 +200,11 @@ function dessiner() {
 }
 
 // ---- éditeur ----
+function codeEdition(on) {
+  el('codeEdit').hidden = !on; el('codeLecture').hidden = on;
+  el('codeBox').hidden = on; el('bVoir').parentNode.hidden = on;
+  if (on) { el('eCode').value = courant ? courant.code : ''; setTimeout(() => el('eCode').focus(), 50); }
+}
 function majCode() {
   el('codeBox').textContent = codeVisible && courant ? courant.code : '••••••••';
   el('bVoir').textContent = codeVisible ? 'Masquer' : 'Afficher';
@@ -220,7 +234,7 @@ function ouvrir(u) {
   el('edSauver').textContent = u ? 'Enregistrer' : 'Créer le compte';
   el('edSauver').disabled = !!u;
   el('msgEd').textContent = ''; el('msgEd').className = ''; el('codeCree').innerHTML = '';
-  majCode(); presets(); interrupteurs(); appareils();
+  codeEdition(false); majCode(); presets(); interrupteurs(); appareils();
   el('editeur').hidden = false; el('page').hidden = true; window.scrollTo(0, 0); el('editeur').scrollTop = 0;
 }
 function fermer() { el('editeur').hidden = true; el('page').hidden = false; courant = null; }
@@ -249,6 +263,23 @@ el('bNeuf').onclick = async () => {
   if (!confirm('Générer un nouveau code pour ' + courant.nom + ' ? L\'ancien code ne marchera plus.')) return;
   try { const r = await Nova.api('usersNouveauCode', { ligne: courant.ligne, ancienNom: courant.nom }, 20000); courant.code = r.code; codeVisible = true; majCode(); el('msgEd').className = 'ok'; el('msgEd').textContent = '✓ Nouveau code généré : transmets-le à la personne.'; }
   catch (e) { el('msgEd').className = 'ko'; el('msgEd').textContent = e.message; }
+};
+el('bModif').onclick = () => { el('msgEd').textContent = ''; el('msgEd').className = ''; codeEdition(true); };
+el('bCodeAnnul').onclick = () => codeEdition(false);
+el('bCodeSauver').onclick = async () => {
+  const nv = el('eCode').value.trim(), msg = el('msgEd');
+  if (nv.length < 6 || /\s/.test(nv)) { msg.className = 'ko'; msg.textContent = 'Le code doit faire au moins 6 caractères, sans espace.'; return; }
+  if (nv === courant.code) { codeEdition(false); return; }
+  if (!confirm('Remplacer le code de ' + courant.nom + ' par « ' + nv + ' » ? L\'ancien code ne marchera plus.')) return;
+  const bt = el('bCodeSauver'); bt.disabled = true; msg.className = ''; msg.textContent = 'Enregistrement du code...';
+  try {
+    const o = {}; DROITS.forEach(d => { o[d] = courant.droits.indexOf(d) >= 0; });
+    await Nova.api('usersSauver', { utilisateur: { ligne: courant.ligne, ancienNom: courant.nom, nom: courant.nom, code: nv, actif: courant.actif, droits: o } }, 20000);
+    courant.code = nv; codeVisible = true; codeEdition(false); majCode();
+    msg.className = 'ok'; msg.textContent = '✓ Code enregistré : transmets-le à la personne.';
+    try { await charger(); } catch (x) {}
+  } catch (e) { msg.className = 'ko'; msg.textContent = e.message; }
+  bt.disabled = false;
 };
 el('edFermer').onclick = () => { if (modifie && !confirm('Quitter sans enregistrer les modifications ?')) return; fermer(); };
 el('btnNouveau').onclick = () => ouvrir(null);
