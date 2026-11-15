@@ -64,7 +64,7 @@
         <dt id="dtCmd">N° de commande</dt><dd id="numeroCommande"></dd>
       </dl>
     </div>
-    <div class="carte">
+    <div class="carte" id="carteBandes">
       <h2>Bandes</h2>
       <table><thead><tr><th>Bande</th><th>Matière</th><th>Largeur</th><th>Longueur</th><th id="thCom">Commentaire</th></tr></thead><tbody id="bandes"></tbody></table>
     </div>
@@ -123,6 +123,7 @@ async function charger() {
     el('horaires').textContent = b.heureArrivee + ' - ' + b.heureFin;
     el('numeroCommande').textContent = b.numeroCommande || '';
     el('dtCmd').hidden = el('numeroCommande').hidden = !b.numeroCommande;
+    el('carteBandes').hidden = !b.bandes.length;   // bon sans bande : tableau masqué
     const avecCom = b.bandes.some(x => String(x.commentaire || '').trim());
     el('thCom').hidden = !avecCom;
     b.bandes.forEach((x, i) => { const tr = document.createElement('tr'); ligne(tr, [i + 1, x.matiere, x.largeur, x.longueur].concat(avecCom ? [x.commentaire || ''] : [])); el('bandes').appendChild(tr); });

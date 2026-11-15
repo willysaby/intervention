@@ -98,6 +98,7 @@
 <div class="carte">
   <b>Bandes</b>
   <div id="bandes"></div>
+  <div id="aucuneBande" class="aidePhotos" hidden>Aucune bande : le bon sera établi sans tableau de bandes.</div>
   <button class="plus" onclick="ajouterBande()">+ Ajouter une bande</button>
 </div>
 
@@ -392,21 +393,21 @@ function ajouterBande() {
 }
 
 function supprimerBande(btn) {
-  if (document.querySelectorAll('.bande').length > 1) {
-    btn.parentElement.remove();
-    renumeroter();
-  }
+  btn.parentElement.remove();   // on peut tout supprimer : un bon sans bande est autorise
+  renumeroter();
 }
 
 function renumeroter() {
   document.querySelectorAll('.bande .titre').forEach((t, i) => t.textContent = 'Bande ' + (i + 1));
+  document.getElementById('aucuneBande').hidden = document.querySelectorAll('.bande').length > 0;
   majCommentaireAuto();
 }
 
 /* Commentaire prérempli : pluriel dès 2 bandes, tant que tu ne l'as pas modifié à la main */
 function majCommentaireAuto() {
   const zone = document.getElementById('commentaire');
-  const voulu = document.querySelectorAll('.bande').length > 1 ? COMMENTAIRE_PLURIEL : COMMENTAIRE_SINGULIER;
+  const nb = document.querySelectorAll('.bande').length;
+  const voulu = nb === 0 ? '' : nb > 1 ? COMMENTAIRE_PLURIEL : COMMENTAIRE_SINGULIER;   // sans bande : commentaire vide, a rediger
   if (zone.value === commentaireAuto) {
     zone.value = voulu;
     commentaireAuto = voulu;
@@ -503,7 +504,7 @@ async function valider() {
     largeur: b.querySelector('.largeur').value,
     longueur: b.querySelector('.longueur').value,
     commentaire: b.querySelector('.commentaireBande').value
-  }));
+  })).filter(b => [b.matiere, b.largeur, b.longueur, b.commentaire].some(v => String(v).trim() !== ''));   // bande vide ignorée
 
   const donnees = {
     idEnvoi: 'B' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
