@@ -75,6 +75,7 @@
   .bas { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 8px; justify-content: center; z-index: 60; }
   .bas .btn { min-width: 140px; }
   #stopBox { margin: 0 0 16px; }
+  .maintBtn { display: block; box-sizing: border-box; width: 100%; text-align: center; margin: 0 0 16px; padding: 16px 18px; border-radius: 16px; font-family: inherit; font-size: 17px; font-weight: 800; line-height: 1.3; text-decoration: none; background: var(--warnbg); color: var(--warnink); border: 2px solid var(--warnink); }
   .stopGros { width: 100%; border: 0; border-radius: 18px; padding: 20px; font-family: inherit; font-size: 20px; font-weight: 800; background: #c62828; color: #fff; box-shadow: 0 6px 18px rgba(198,40,40,.3); }
   .stopGros.confirme { background: #7f1010; }
   .stopGros.vert { background: var(--vert); box-shadow: 0 6px 18px rgba(14,144,98,.25); }
@@ -91,7 +92,7 @@
 <div class="page" id="page">
   <div class="haut"><a href="./">← Accueil</a><h1>Utilisateurs et droits</h1></div>
   <div id="stopBox"></div>
-  <a class="btn" href="maintenance.html" style="display:block;text-align:center;margin:0 0 16px">Maintenance : compteur des bons et suppression d'un bon d'essai</a>
+  <a class="maintBtn" href="maintenance.html">Maintenance : compteur des bons et suppression d'un bon d'essai</a>
   <div id="infos"></div>
   <div id="erreur" class="erreurPage" hidden></div>
   <div class="barre">
