@@ -123,6 +123,7 @@ async function charger() {
     el('horaires').textContent = b.heureArrivee + ' - ' + b.heureFin;
     el('numeroCommande').textContent = b.numeroCommande || '';
     el('dtCmd').hidden = el('numeroCommande').hidden = !b.numeroCommande;
+    b.bandes = (b.bandes || []).filter(x => [x.matiere, x.largeur, x.longueur, x.commentaire].some(v => String(v || '').trim()));   // bandes vides ignorées
     el('carteBandes').hidden = !b.bandes.length;   // bon sans bande : tableau masqué
     const avecCom = b.bandes.some(x => String(x.commentaire || '').trim());
     el('thCom').hidden = !avecCom;
