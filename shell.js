@@ -47,7 +47,7 @@
   const ONGLETS_GEST = [
     { id: 'jonction', lib: 'Jonction', href: 'jonction.html', ic: 'sliders', droit: 'jonction', fichiers: ['jonction.html'] },
     { id: 'inter', lib: 'Intervention', href: 'commandes.html', ic: 'wrench', droit: ['intervention', 'gestion'], fichiers: ['commandes.html', 'intervention.html', 'termines.html', 'distance.html'] },
-    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', droit: null, fichiers: ['', 'index.html', 'utilisateurs.html', 'fournisseurs.html'] },
+    { id: 'accueil', lib: 'Accueil', href: './', ic: 'home', droit: null, fichiers: ['', 'index.html', 'utilisateurs.html', 'fournisseurs.html', 'maintenance.html'] },
     { id: 'achats', lib: 'Achats', href: 'achats.html', ic: 'cart', droit: 'achats', fichiers: ['achats.html', 'achat-nouveau.html'] },
     { id: 'nc', lib: 'NC', href: 'nc.html', ic: 'alert', droit: 'nc', fichiers: ['nc.html', 'nc-ajout.html'] }
   ];
@@ -56,7 +56,7 @@
   const SOUS_TITRES = { accueil: 'Les interventions Novafit', jonction: 'Paramètres de jonction', bon: 'Bon d\'intervention vierge',
     commandes: 'Bon d\'intervention de commande', finies: 'Interventions finies', inter: 'Interventions', achats: 'Achats fournisseurs', nc: 'Non-conformités' };
 
-  const TITRES_PAGES = { 'nc.html': 'Non-conformités', 'nc-ajout.html': 'Ajouter une non-conformité', 'achats.html': 'Achats fournisseurs', 'achat-nouveau.html': 'Nouvelle commande', 'fournisseurs.html': 'Annuaire des fournisseurs', 'utilisateurs.html': 'Utilisateurs et droits' };
+  const TITRES_PAGES = { 'maintenance.html': 'Maintenance', 'nc.html': 'Non-conformités', 'nc-ajout.html': 'Ajouter une non-conformité', 'achats.html': 'Achats fournisseurs', 'achat-nouveau.html': 'Nouvelle commande', 'fournisseurs.html': 'Annuaire des fournisseurs', 'utilisateurs.html': 'Utilisateurs et droits' };
   function fichierCourant() { return decodeURIComponent(location.pathname.split('/').pop()); }
   function ongletActif() {
     const f = fichierCourant();
