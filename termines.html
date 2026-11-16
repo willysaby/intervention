@@ -27,7 +27,7 @@
   </div>
   <div class="filtres">
     <div><label for="recherche">Recherche libre</label><input class="champ" id="recherche" type="search" placeholder="Tous les champs"></div>
-    <div><label for="fBon">N° de BL</label><input class="champ" id="fBon" type="search"></div>
+    <div><label for="fBon">N° de BI</label><input class="champ" id="fBon" type="search"></div>
     <div><label for="fCommande">N° de commande</label><input class="champ" id="fCommande" type="search"></div>
     <div><label for="fClient">Client</label><input class="champ" id="fClient" type="search"></div>
     <div><label for="fDu">Date : du</label><input class="champ" id="fDu" type="date"></div>
@@ -44,7 +44,7 @@
 <script>
 const CLE_CACHE = 'termineCache';
 // Titres fixes des 14 colonnes (indépendants de la ligne 1 du Sheet)
-const NOMS_COLONNES = ['N° de BL', 'N° de commande', 'Date d\'intervention', 'Client', 'Email client', 'Nom du signataire', 'Technicien',
+const NOMS_COLONNES = ['N° de BI', 'N° de commande', 'Date d\'intervention', 'Client', 'Email client', 'Nom du signataire', 'Technicien',
   'Matière', 'Largeur', 'Longueur', 'Commentaire (bande)', 'Commentaire intervention', 'Heure d\'arrivée', 'Heure de fin'];
 const LIMITE_EDITION = 50;
 let donnees = null, horsLigne = false, edition = false, edits = {}, minuteur = null;
@@ -104,7 +104,7 @@ function criteres() {
 }
 function filtreActif(c) { return !!(c.texte || c.bon || c.commande || c.client || c.du !== null || c.au !== null); }
 
-// Colonnes : 0 N° de BL, 1 N° de commande, 2 Date, 3 Client
+// Colonnes : 0 N° de BI, 1 N° de commande, 2 Date, 3 Client
 function groupeCorrespond(gr, c) {
   const p = gr[0].l;
   if (c.bon && Nova.norm(p[0]).indexOf(c.bon) < 0) return false;
