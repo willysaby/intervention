@@ -117,6 +117,64 @@
     document.body.appendChild(nav);
   }
 
+
+  // ---------- Contrôle de migration : prévient (niveau 1) ou bloque (niveau 2) les gens restés sur l'ancienne adresse ----------
+  // Le niveau se règle dans Maintenance (0 rien, 1 avertissement, 2 blocage). Sur la nouvelle adresse, rien ne s'affiche jamais.
+  function envoisEnAttente() {
+    let n = 0;
+    try { n += (window.Nova && Nova.lireFile ? Nova.lireFile().length : 0); } catch (e) {}
+    try { n += (JSON.parse(localStorage.getItem('bonsEnAttente')) || []).length; } catch (e) {}
+    return n;
+  }
+  function migrationAppliquer(m) {
+    document.querySelectorAll('.migBandeau, .migBloc').forEach(function (e) { e.remove(); });
+    if (!m || !m.niveau || !m.adresse) return;
+    let hote = '';
+    try { hote = new URL(m.adresse).hostname; } catch (e) { return; }
+    if (location.hostname === hote) return;   // déjà sur la nouvelle adresse
+    const f = fichierCourant(), accueil = (f === '' || f === 'index.html');
+    const att = envoisEnAttente();
+    const attTxt = att ? 'Tu as ' + att + ' envoi' + (att > 1 ? 's' : '') + ' en attente sur cet appareil : ouvre l\'accueil ici pour les envoyer AVANT de changer (ils ne suivent pas sur la nouvelle adresse).' : '';
+    const lien = '<a class="plein" href="' + m.adresse.replace(/"/g, '') + '">Ouvrir la nouvelle version</a>';
+    const aide = 'Sur téléphone : ouvre la nouvelle adresse dans Chrome, menu ⋮ puis « Ajouter à l\'écran d\'accueil », et supprime l\'ancienne icône. Tu devras te reconnecter avec ton code.';
+    if (m.niveau === 1 || (m.niveau === 2 && att && accueil)) {
+      if (m.niveau === 1) { try { if (sessionStorage.getItem('migrationMasquee')) return; } catch (e) {} }
+      const b = document.createElement('div');
+      b.className = 'migBandeau' + (m.niveau === 2 ? ' rouge' : '');
+      b.innerHTML = '<b>' + (m.niveau === 2 ? 'Cette version va être coupée' : 'Cette version est ancienne') + '</b>Novafit a changé d\'adresse. ' + (attTxt ? attTxt + ' ' : '') + aide +
+        '<div class="migBoutons">' + lien + (m.niveau === 1 ? '<button type="button" id="migPlusTard">Plus tard</button>' : '') + '</div>';
+      document.body.appendChild(b);
+      const pt = b.querySelector('#migPlusTard');
+      if (pt) pt.onclick = function () { try { sessionStorage.setItem('migrationMasquee', '1'); } catch (e) {} b.remove(); };
+    } else if (m.niveau === 2) {
+      const o = document.createElement('div');
+      o.className = 'migBloc';
+      o.innerHTML = '<div class="migCarte"><h2>Cette version n\'est plus utilisable</h2>Novafit a changé d\'adresse. Pour continuer, utilise la nouvelle version.' +
+        (attTxt ? '<p><b>' + attTxt + '</b></p>' : '') + '<p>' + aide + '</p>' +
+        '<div class="migBoutons">' + lien + (att ? '<a href="./">Envoyer mes envois en attente</a>' : '') + '</div>' +
+        '<small>Si tu penses que c\'est une erreur, préviens l\'administrateur.</small></div>';
+      document.body.appendChild(o);
+    }
+  }
+  function migrationControle() {
+    if (!window.CONFIG || !CONFIG.URL_API) return;
+    let cache = null;
+    try { cache = JSON.parse(localStorage.getItem('migrationEtat')); } catch (e) {}
+    if (cache) migrationAppliquer(cache);   // dernier niveau connu (marche aussi hors ligne)
+    if (!navigator.onLine) return;
+    const ctl = window.AbortController ? new AbortController() : null;
+    if (ctl) setTimeout(function () { ctl.abort(); }, 8000);
+    fetch(CONFIG.URL_API, { method: 'POST', body: JSON.stringify({ action: 'migrationEtat' }), signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.ok) return;
+        const m = { niveau: j.niveau, adresse: j.adresse };
+        try { localStorage.setItem('migrationEtat', JSON.stringify(m)); } catch (e) {}
+        migrationAppliquer(m);
+      }).catch(function () {});
+  }
+  function demarrer() { construire(); migrationControle(); }
+
   window.Shell = { svg: svg };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', construire); else construire();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer); else demarrer();
 })();

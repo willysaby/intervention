@@ -20,3 +20,17 @@ body.avecBarre { padding-bottom: calc(84px + env(safe-area-inset-bottom)) !impor
 
 /* Jonction : page en colonne, l'en-tête reste en haut */
 body > .enteteApp { flex: none; }
+
+/* Contrôle de migration vers le nouveau site (avertissement / blocage) */
+.migBandeau { position: fixed; left: 10px; right: 10px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 60; background: var(--warnbg); color: var(--warnink); border: 2px solid var(--warnink); border-radius: 16px; padding: 14px 16px; box-shadow: 0 6px 24px rgba(0,0,0,.35); font-size: 15px; line-height: 1.4; }
+.migBandeau.rouge { background: var(--kobg); color: var(--koink); border-color: var(--koink); }
+.migBandeau b { display: block; font-size: 16px; margin-bottom: 4px; }
+.migBoutons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.migBoutons a, .migBoutons button { flex: 1 1 140px; text-align: center; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; border: 2px solid currentColor; background: transparent; color: inherit; }
+.migBoutons a.plein { background: var(--warnink); color: var(--warnbg); border-color: var(--warnink); }
+.migBandeau.rouge .migBoutons a.plein { background: var(--koink); color: var(--kobg); border-color: var(--koink); }
+.migBloc { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.78); }
+.migBloc .migCarte { max-width: 460px; width: 100%; background: var(--card, #fff); color: var(--ink, #111); border: 2px solid var(--koink); border-radius: 20px; padding: 22px; font-size: 16px; line-height: 1.45; }
+.migBloc .migCarte h2 { margin: 0 0 10px; font-size: 22px; color: var(--koink); }
+.migBloc .migCarte small { display: block; margin-top: 12px; color: var(--mute); font-size: 13px; }
+.migBloc .migBoutons a.plein { background: var(--koink); color: var(--kobg); border-color: var(--koink); }

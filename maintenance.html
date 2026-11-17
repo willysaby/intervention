@@ -60,6 +60,24 @@
   </div>
 
   <div class="bloc">
+    <h2>Migration vers novafit.fr</h2>
+    <p>Concerne seulement les gens restés sur l'ancienne adresse (GitHub). Sur la nouvelle adresse, rien ne s'affiche jamais.</p>
+    <label class="opt"><input type="radio" name="mig" value="0"> <span><b>Niveau 1 · Rien</b> (par défaut) : aucun message.</span></label>
+    <label class="opt"><input type="radio" name="mig" value="1"> <span><b>Niveau 2 · Avertissement</b> : bandeau « Cette version est ancienne » avec bouton vers la nouvelle adresse. On peut continuer.</span></label>
+    <label class="opt"><input type="radio" name="mig" value="2"> <span><b>Niveau 3 · Blocage</b> : plein écran, impossible de continuer (l'accueil reste ouvert tant qu'il y a des envois en attente à envoyer).</span></label>
+    <button class="btn vert" id="btnMigration" type="button">Enregistrer le niveau</button>
+    <p id="infoMigration"></p>
+    <p>Nouvelle adresse : <b id="adresseMig"></b> (réglée dans <code>Code.gs</code>, ligne <code>MIGRATION_ADRESSE</code>). Attention : le blocage s'applique aussi à toi sur l'ancienne adresse. Pour le retirer, ouvre la nouvelle adresse et reviens ici.</p>
+  </div>
+
+  <div class="bloc">
+    <h2>Appareils</h2>
+    <p id="infoAppareils"></p>
+    <button class="btn" id="btnAppareils" type="button">Valider tous les nouveaux appareils</button>
+    <p>Après la bascule, chacun se reconnecte depuis un appareil qui paraît neuf : au lieu de cliquer sur « C'est bon » un par un, valide-les tous d'un coup. Il n'y a de toute façon aucun blocage lié au nombre d'appareils : seul le voyant orange de l'accueil est concerné.</p>
+  </div>
+
+  <div class="bloc">
     <h2>Limites d'envoi</h2>
     <p id="infoLimites"></p>
     <button class="btn" id="btnLimites" type="button">Remettre les limites à zéro</button>
@@ -84,6 +102,11 @@ function dessiner() {
   el('infoCompteur').appendChild(h('div', null, 'Prochain bon : ' + r.prochain + ' (compteur = ' + r.compteur + ')'));
   el('valeurCompteur').value = r.dernier;
   el('infoLimites').textContent = 'Envois comptés aujourd\'hui : ' + r.envoisAujourdhui + '.';
+  document.querySelectorAll('input[name=mig]').forEach(i => { i.checked = Number(i.value) === r.migration.niveau; });
+  el('adresseMig').textContent = r.migration.adresse;
+  el('infoMigration').textContent = 'Niveau actuel : ' + ['rien', 'avertissement', 'blocage'][r.migration.niveau] + '.';
+  el('infoAppareils').textContent = r.appareilsNouveaux ? r.appareilsNouveaux + ' appareil' + (r.appareilsNouveaux > 1 ? 's' : '') + ' à valider.' : 'Aucun nouvel appareil en attente.';
+  el('btnAppareils').disabled = !r.appareilsNouveaux;
   const z = el('bons'); z.innerHTML = '';
   if (!r.bons.length) z.appendChild(h('div', null, 'Aucun bon.'));
   r.bons.forEach(b => {
@@ -135,6 +158,19 @@ el('btnLimites').onclick = async () => {
   if (!surLim) { surLim = true; b.textContent = 'Confirmer la remise à zéro'; setTimeout(() => { surLim = false; b.textContent = 'Remettre les limites à zéro'; }, 5000); return; }
   surLim = false; b.textContent = 'Remettre les limites à zéro';
   try { await Nova.api('maintenanceLimites', null, 20000); msg('Limites d\'envoi remises à zéro.', true); }
+  catch (e) { msg(e.message, false); }
+  charger();
+};
+el('btnMigration').onclick = async () => {
+  const c = document.querySelector('input[name=mig]:checked'); if (!c) return;
+  if (c.value === '2' && !confirm('Activer le BLOCAGE ? Toute personne restée sur l\'ancienne adresse sera bloquée (toi aussi sur cette adresse).')) return;
+  try { await Nova.api('maintenanceMigration', { niveau: Number(c.value) }, 20000); msg('Niveau enregistré. Les appareils le prennent en compte à leur prochaine ouverture.', true); }
+  catch (e) { msg(e.message, false); }
+  charger();
+};
+el('btnAppareils').onclick = async () => {
+  if (!confirm('Valider tous les nouveaux appareils ?')) return;
+  try { const r = await Nova.api('maintenanceAppareils', null, 30000); msg(r.valides + ' appareil(s) validé(s).', true); }
   catch (e) { msg(e.message, false); }
   charger();
 };
