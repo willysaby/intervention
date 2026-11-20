@@ -44,7 +44,11 @@
 <body>
 <div class="page" id="page">
   <div class="haut"><a href="./">← Accueil</a><h1>Bons à signer</h1><button class="btn" id="btnActualiser" type="button">Actualiser</button></div>
-  <a class="gros" href="commandes.html?mode=distance"><div class="pic" id="icNouveau"></div><div class="tx"><b>Nouveau bon à signer</b><span>Je prépare le bon, le client le signe en ligne</span></div><span class="fl" id="flNouveau"></span></a>
+  <a class="gros" href="intervention.html?mode=distance"><div class="pic" id="icNouveau"></div><div class="tx"><b>Nouveau bon vierge à signer</b><span>Sans commande : je saisis tout, le client signe en ligne</span></div><span class="fl" id="flNouveau"></span></a>
+  <div class="sep">ou depuis une commande en cours</div>
+  <input class="champ" id="recherche" type="search" placeholder="Rechercher (N° de commande, client)">
+  <div id="infosCmd"></div>
+  <div class="liste" id="liste"></div>
   <div id="msg"></div>
   <div id="aEnvoyer"></div>
   <div class="sep" id="sepAtt" hidden>En attente de signature</div>
@@ -82,6 +86,66 @@ function dessinerFile() {
   };
   b.appendChild(btn);
   z.appendChild(b);
+}
+
+
+/* ---------- Commandes en cours (choisir la commande du client) ---------- */
+const CLE_CACHE = 'commandesCache';
+let commandes = [];
+function corrigerClient(c) {
+  if (c.client) return c;
+  const base = String(c.nom || '').replace(/\.pdf$/i, '');
+  const m = base.match(/^(.+?)\s+[-–—]\s+(.+)$/) || base.match(/^([^-–—]+?)\s*[-–—]\s*(.+)$/);
+  return m ? Object.assign({}, c, { cd: m[1].trim(), client: m[2].trim() }) : c;
+}
+function dessinerCmd(horsLigne) {
+  const filtre = Nova.norm(el('recherche').value.trim());
+  let att = [];
+  try { att = Nova.lireFile().filter(x => x.action === 'distanceCreer').map(x => x.donnees && x.donnees.docId).filter(Boolean); } catch (e) {}
+  const liste = el('liste'); liste.innerHTML = '';
+  let n = 0;
+  commandes.forEach(c => {
+    if (filtre && Nova.norm(c.cd + ' ' + c.client + ' ' + c.nom).indexOf(filtre) < 0) return;
+    n++;
+    const b = h('button', 'item'); b.type = 'button';
+    b.appendChild(h('b', null, c.cd || c.nom));
+    if (c.client) b.appendChild(h('small', null, c.client));
+    if (att.indexOf(c.id) >= 0) b.appendChild(h('span', 'attente', 'Bon en attente d\'envoi'));
+    b.onclick = () => ouvrirCmd(c);
+    liste.appendChild(b);
+  });
+  let t = n + (n > 1 ? ' commandes' : ' commande');
+  if (!commandes.length) t = 'Aucune commande en cours.'; else if (!n) t = 'Aucun résultat.';
+  if (horsLigne) t += ' · liste enregistrée sur l\'appareil (hors ligne)';
+  el('infosCmd').textContent = t;
+}
+function ouvrirCmd(c) {
+  const url = 'intervention.html?doc=' + encodeURIComponent(c.id) + '&cd=' + encodeURIComponent(c.cd) + '&client=' + encodeURIComponent(c.client) + '&mode=distance';
+  let lecture = null;
+  Nova.ouvrirVisio({
+    id: c.id,
+    titre: (c.cd ? c.cd : '') + (c.client ? ' · ' + c.client : ''),
+    surDocument: bytes => { lecture = Nova.extraireContact(bytes); },
+    action: { texte: 'Préparer le bon à signer', fn: async () => {
+      let x = {};
+      try { if (lecture) x = await Promise.race([lecture, new Promise(r => setTimeout(() => r({}), 8000))]) || {}; } catch (e) {}
+      location.href = url + (x.contact ? '&contact=' + encodeURIComponent(x.contact) : '') + (x.email ? '&email=' + encodeURIComponent(x.email) : '');
+    } }
+  });
+}
+async function chargerCmd() {
+  el('infosCmd').textContent = 'Chargement des commandes...';
+  let memo = null;
+  try { memo = JSON.parse(localStorage.getItem(CLE_CACHE)); } catch (x) {}
+  if (Array.isArray(memo)) { commandes = memo.map(corrigerClient); dessinerCmd(true); }
+  try {
+    const res = await Nova.api('commandes', null, 12000);
+    commandes = res.commandes.map(corrigerClient);
+    try { localStorage.setItem(CLE_CACHE, JSON.stringify(commandes)); } catch (e) {}
+    dessinerCmd(false);
+  } catch (e) {
+    if (!Array.isArray(memo)) { el('infosCmd').textContent = ''; const b = h('div', 'erreurPage', e.message); el('liste').innerHTML = ''; el('liste').appendChild(b); }
+  }
 }
 
 /* ---------- Liste ---------- */
@@ -132,6 +196,7 @@ async function annuler(b, btn) {
 }
 
 async function charger() {
+  chargerCmd();
   dessinerFile();
   el('infos').textContent = 'Chargement...';
   try {
@@ -157,6 +222,7 @@ if (Nova.exiger('distance')) {
     el('flNouveau').innerHTML = Shell.svg('chevron', 24);
   });
   el('btnActualiser').onclick = charger;
+  el('recherche').addEventListener('input', () => dessinerCmd(false));
   document.addEventListener('nova:file', dessinerFile);
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   charger();
