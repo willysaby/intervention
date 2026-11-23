@@ -41,6 +41,7 @@
   <div class="haut"><a href="utilisateurs.html">← Utilisateurs</a><h1>Maintenance</h1><button class="btn" id="btnActualiser" type="button">Actualiser</button></div>
   <div class="avert">Réservé à l'administrateur, pour les essais. Une suppression est définitive. Les emails déjà envoyés restent dans les boîtes de réception : seuls le Sheet et le Drive sont nettoyés.</div>
   <div id="msg"></div>
+  <div class="bloc"><h2>Version</h2><p id="versionScript">Lecture de la version du script...</p></div>
 
   <div class="bloc">
     <h2>Compteur des bons d'intervention</h2>
@@ -176,7 +177,14 @@ el('btnAppareils').onclick = async () => {
 };
 el('btnActualiser').onclick = charger;
 
+async function lireVersion() {
+  try {
+    const r = await fetch(window.CONFIG.URL_API); const d = await r.json();
+    el('versionScript').textContent = 'Script Apps Script : ' + (d.version || 'ancienne version (nouvelle version à déployer)') + ' · Page : 2026-11-23-c';
+  } catch (e) { el('versionScript').textContent = 'Version du script illisible (réseau).'; }
+}
 if (Nova.exiger('admin')) {
+  lireVersion();
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   charger();
 }

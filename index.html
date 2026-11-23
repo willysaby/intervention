@@ -79,6 +79,9 @@
   .brouillon { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--warnbg); color: var(--warnink); border: 2px solid #e0b100; border-radius: 16px; padding: 12px 16px; margin: 8px 0; text-decoration: none; font-weight: 700; }
   .brouillon small { display: block; font-weight: 500; opacity: .85; margin-top: 2px; }
   .brouillon span.go { font-size: 14px; white-space: nowrap; }
+  .brouillonLigne { display: flex; gap: 8px; align-items: stretch; margin: 8px 0; }
+  .brouillonLigne .brouillon { flex: 1; margin: 0; }
+  .brouillonSup { flex: none; padding: 0 14px; border: 1px solid var(--koink); color: var(--koink); background: var(--card); border-radius: 16px; font-weight: 700; font-family: inherit; font-size: 14px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -561,7 +564,16 @@ function afficherBrouillons() {
     t.appendChild(sm);
     const g = document.createElement('span'); g.className = 'go'; g.textContent = 'Reprendre →';
     a.appendChild(t); a.appendChild(g);
-    z.appendChild(a);
+    const ligne = document.createElement('div'); ligne.className = 'brouillonLigne';
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'brouillonSup'; x.textContent = 'Supprimer';
+    x.setAttribute('aria-label', 'Supprimer ce brouillon');
+    x.onclick = () => {
+      if (!confirm('Supprimer le brouillon « ' + b.titre + ' » ? Le bon saisi sera perdu.')) return;
+      try { const m = JSON.parse(localStorage.getItem('brouillonsBon')) || {}; delete m[k]; localStorage.setItem('brouillonsBon', JSON.stringify(m)); } catch (e) {}
+      afficherBrouillons();
+    };
+    ligne.appendChild(a); ligne.appendChild(x);
+    z.appendChild(ligne);
   });
 }
 
