@@ -63,6 +63,14 @@
   .vig img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .vig b { position: absolute; top: 3px; right: 3px; width: 26px; height: 26px; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; display: grid; place-items: center; font-size: 16px; cursor: pointer; }
   .aidePhotos { font-size: 13px; color: #777; margin-top: 8px; }
+  #phrases { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+  #phrases:empty { display: none; }
+  #phrases button { font-size: 14px; padding: 8px 12px; border: 1px solid var(--lien); color: var(--lien); background: var(--accentbg); border-radius: 999px; text-align: left; }
+  #phrases button:active { background: var(--lien); color: #fff; }
+  #bandeauBrouillon { display: none; max-width: 720px; margin: 0 auto 14px; padding: 10px 16px; background: var(--okbg); color: var(--okink); border-radius: 12px; font-weight: 600; font-size: 14px; }
+  #bandeauBrouillon button { margin-left: 8px; padding: 6px 10px; font-size: 13px; border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 8px; }
+  #etatBrouillon { text-align: center; font-size: 12px; color: var(--mute); margin-top: 8px; min-height: 1em; }
+  button.sec { width: 100%; margin-top: 12px; padding: 12px; font-size: 15px; font-weight: 600; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 10px; }
 </style>
 </head>
 <body>
@@ -75,6 +83,7 @@
 </div>
 <div id="infoHaut"></div>
 <div id="bandeauDistance" class="carte" hidden></div>
+<div id="bandeauBrouillon"></div>
 
 <div class="carte">
   <div class="entete">
@@ -99,11 +108,13 @@
   <b>Bandes</b>
   <div id="bandes"></div>
   <div id="aucuneBande" class="aidePhotos" hidden>Aucune bande : le bon sera établi sans tableau de bandes.</div>
-  <button class="plus" onclick="ajouterBande()">+ Ajouter une bande</button>
+  <button class="plus" onclick="ajouterBande(); planifier()">+ Ajouter une bande</button>
 </div>
 
 <div class="carte">
-  <label>Commentaire</label><textarea id="commentaire" rows="5"></textarea>
+  <label>Commentaire</label>
+  <div id="phrases"></div>
+  <textarea id="commentaire" rows="5"></textarea>
 </div>
 
 <div class="carte">
@@ -132,7 +143,9 @@
 
 <div class="carte">
   <button class="valider" id="btnValider" onclick="valider()">Valider et envoyer</button>
+  <button class="sec" id="btnVersDistance" type="button" onclick="versDistance()">Le client est parti : l'envoyer à signer à distance</button>
   <div id="message"></div>
+  <div id="etatBrouillon"></div>
 </div>
 
 <div id="versions"></div>
@@ -144,7 +157,7 @@ const URL_API = (window.CONFIG && window.CONFIG.URL_API) || '';
 function urlApiRenseignee() { return URL_API !== '' && URL_API.indexOf('COLLE_ICI') !== 0; }
 const CLE_ATTENTE = 'bonsEnAttente';
 const CLE_TECHNICIENS = 'techniciensMemorises';
-const VERSION_PAGE = '2026-11-15-a';
+const VERSION_PAGE = '2026-11-23-b';
 const COMMENTAIRE_SINGULIER = 'Intervention sur site pour la mise en longueur + jonction + réglage bande client. A contrôler en production';
 const COMMENTAIRE_PLURIEL = 'Intervention sur site pour les mises en longueur + jonctions + réglages bandes client. A contrôler en production';
 let commentaireAuto = '';
@@ -290,8 +303,179 @@ async function init() {
   ajouterBande();
   afficherAttente();
   afficherStatutReseau();
+  if (DISTANCE) document.getElementById('btnVersDistance').hidden = true;
+  chargerPhrases();
   await chargerDonnees();
+  if (!restaurerBrouillon()) {
+    const autres = Object.entries(lireBrouillons()).filter(([k]) => k !== CLE_CTX);
+    if (autres.length && (DOC_ID || !PARAMS.get('b'))) await demanderChoix(autres);
+  }
+  if (!DOC_ID && !PARAMS.get('b')) { try { const u = new URL(location.href); u.searchParams.set('b', BID); history.replaceState(null, '', u.pathname.split('/').pop() + u.search); } catch (e) {} }
+  brancherBrouillon();
   envoyerEnAttente(false);
+}
+
+/* ---------- Phrases rapides (onglet « Phrases » du Sheet, modifiable par toi) ---------- */
+const CLE_PHRASES = 'phrasesRapides';
+function dessinerPhrases(liste) {
+  const z = document.getElementById('phrases');
+  z.innerHTML = '';
+  (liste || []).forEach(t => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = '+ ' + t;
+    b.onclick = () => {
+      const c = document.getElementById('commentaire');
+      const v = c.value.replace(/\s+$/, '');
+      c.value = v ? v + '\n' + t : t;
+      c.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    z.appendChild(b);
+  });
+}
+async function chargerPhrases() {
+  try { dessinerPhrases(JSON.parse(localStorage.getItem(CLE_PHRASES) || '[]')); } catch (e) {}
+  try {
+    const r = await Nova.api('phrases', null, 8000);
+    dessinerPhrases(r.phrases);
+    try { localStorage.setItem(CLE_PHRASES, JSON.stringify(r.phrases)); } catch (e) {}
+  } catch (e) { /* hors ligne ou script pas à jour : on garde la liste enregistrée */ }
+}
+
+/* ---------- Brouillon : le bon en cours est gardé sur l'appareil, on peut quitter la page et revenir ---------- */
+const CLE_BROUILLONS = 'brouillonsBon';
+// Un seul brouillon par commande (c|<id du PDF>) ; un bon vierge a son propre identifiant (v|<b>, gardé dans l'adresse de la page)
+const BID = DOC_ID ? '' : (PARAMS.get('b') || ('B' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)));
+const CLE_CTX = DOC_ID ? 'c|' + DOC_ID : 'v|' + BID;
+let brouillonFerme = false, brouillonSale = false, minuteurBrouillon = null;
+function lireBrouillons() {
+  let o = {};
+  try { o = JSON.parse(localStorage.getItem(CLE_BROUILLONS)) || {}; } catch (e) {}
+  const limite = Date.now() - 7 * 86400000;
+  Object.keys(o).forEach(k => {
+    if (!o[k] || !o[k].ts || o[k].ts < limite) { delete o[k]; return; }
+    const m = k.match(/^[nd]\|(.*)$/);   // anciennes clés (version du matin) : rangées sous la nouvelle forme
+    if (m) {
+      const b = o[k]; delete o[k];
+      if (m[1]) o['c|' + m[1]] = b;
+      else { b.url = (b.url || 'intervention.html') + (String(b.url || '').indexOf('?') >= 0 ? '&' : '?') + 'b=ancien'; o['v|ancien'] = b; }
+    }
+  });
+  return o;
+}
+function ecrireBrouillons(o) {
+  try { localStorage.setItem(CLE_BROUILLONS, JSON.stringify(o)); return true; } catch (e) { return false; }
+}
+function capturerBrouillon(avecPhotos) {
+  const v = id => document.getElementById(id).value;
+  return {
+    ts: Date.now(),
+    url: 'intervention.html' + location.search,
+    distance: DISTANCE,
+    titre: (v('client').trim() || v('numeroCommande').trim() || 'sans nom'),
+    champs: { numeroCommande: v('numeroCommande'), client: v('client'), nomSignataire: v('nomSignataire'), emailClient: v('emailClient'),
+      autreTechnicien: v('autreTechnicien'), commentaire: v('commentaire'), arriveeH: v('arriveeH'), arriveeM: v('arriveeM'), finH: v('finH'), finM: v('finM') },
+    techs: [...document.querySelectorAll('#techniciens input:checked')].map(c => c.value),
+    bandes: [...document.querySelectorAll('.bande')].map(b => ({ matiere: b.querySelector('.matiere').value, largeur: b.querySelector('.largeur').value,
+      longueur: b.querySelector('.longueur').value, commentaire: b.querySelector('.commentaireBande').value })),
+    commentaireAuto: commentaireAuto,
+    photos: avecPhotos ? photos.slice() : []
+  };
+}
+function sauverBrouillon() {
+  if (brouillonFerme || !brouillonSale) return;
+  const o = lireBrouillons();
+  o[CLE_CTX] = capturerBrouillon(true);
+  let ok = ecrireBrouillons(o);
+  if (!ok) { o[CLE_CTX] = capturerBrouillon(false); ok = ecrireBrouillons(o); }   // mémoire pleine : on garde tout sauf les photos
+  const e = document.getElementById('etatBrouillon');
+  if (e) e.textContent = ok ? 'Brouillon enregistré sur l\'appareil à ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ' · tu peux quitter la page et revenir' : 'Brouillon non enregistré (mémoire de l\'appareil pleine)';
+}
+function planifier() {
+  if (brouillonFerme) return;
+  brouillonSale = true;
+  clearTimeout(minuteurBrouillon);
+  minuteurBrouillon = setTimeout(sauverBrouillon, 600);
+}
+function effacerBrouillon() {
+  brouillonFerme = true;
+  clearTimeout(minuteurBrouillon);
+  const o = lireBrouillons(); delete o[CLE_CTX]; ecrireBrouillons(o);
+}
+function brancherBrouillon() {
+  document.addEventListener('input', planifier);
+  document.addEventListener('change', planifier);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) sauverBrouillon(); });
+  window.addEventListener('pagehide', sauverBrouillon);
+}
+function restaurerBrouillon() {
+  const b = lireBrouillons()[CLE_CTX];
+  if (!b) return false;
+  const set = (id, v) => { const e = document.getElementById(id); if (e && v != null) e.value = v; };
+  Object.keys(b.champs || {}).forEach(k => set(k, b.champs[k]));
+  const boites = [...document.querySelectorAll('#techniciens input')];
+  if (b.techs && b.techs.length) { boites.forEach(x => { x.checked = b.techs.indexOf(x.value) >= 0; }); }
+  document.getElementById('bandes').innerHTML = '';
+  (b.bandes && b.bandes.length ? b.bandes : []).forEach(x => {
+    ajouterBande();
+    const d = document.querySelector('.bande:last-child');
+    d.querySelector('.matiere').value = x.matiere || ''; d.querySelector('.largeur').value = x.largeur || '';
+    d.querySelector('.longueur').value = x.longueur || ''; d.querySelector('.commentaireBande').value = x.commentaire || '';
+  });
+  renumeroter();
+  commentaireAuto = b.commentaireAuto != null ? b.commentaireAuto : '';
+  set('commentaire', b.champs && b.champs.commentaire);
+  if (b.photos && b.photos.length) { photos = b.photos.slice(); dessinerPhotos(); }
+  const bd = document.getElementById('bandeauBrouillon');
+  const h = new Date(b.ts).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  bd.innerHTML = '';
+  bd.appendChild(document.createTextNode('Brouillon repris (enregistré le ' + h + ').'));
+  const r = document.createElement('button'); r.type = 'button'; r.textContent = 'Repartir de zéro';
+  r.onclick = () => { if (confirm('Supprimer ce brouillon et repartir d\'un bon vide ?')) { effacerBrouillon(); location.reload(); } };
+  bd.appendChild(r);
+  bd.style.display = 'block';
+  return true;
+}
+
+/* Un autre bon est déjà en cours sur ce téléphone : on demande de le reprendre ou d'en commencer un nouveau (les deux sont gardés) */
+function demanderChoix(autres) {
+  return new Promise(resolve => {
+    const fond = document.createElement('div');
+    fond.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:grid;place-items:center;padding:16px';
+    const bt = document.createElement('div');
+    bt.style.cssText = 'background:var(--card);color:var(--ink);border-radius:16px;padding:18px;max-width:460px;width:100%;max-height:90vh;overflow:auto';
+    const ou = DOC_ID ? (PARAMS.get('client') || PARAMS.get('cd') || 'cette commande') : 'un bon vierge';
+    const h = document.createElement('div'); h.style.cssText = 'font-weight:800;font-size:18px;margin-bottom:8px';
+    h.textContent = autres.length > 1 ? autres.length + ' bons sont déjà en cours' : 'Un bon est déjà en cours';
+    bt.appendChild(h);
+    const t = document.createElement('div'); t.style.cssText = 'font-size:14px;margin-bottom:12px;color:var(--mute)';
+    t.textContent = 'Tu ouvres : ' + ou + '. Si c\'est le même client, reprends le bon en cours. Sinon, commence-en un nouveau : l\'autre est gardé.';
+    bt.appendChild(t);
+    autres.forEach(([k, b]) => {
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'valider';
+      x.style.cssText = 'margin-bottom:8px;font-size:16px;padding:12px;text-align:left';
+      x.textContent = 'Reprendre : ' + b.titre + (b.champs && b.champs.numeroCommande ? ' (' + b.champs.numeroCommande + ')' : '');
+      x.onclick = () => { brouillonFerme = true; location.href = b.url; };
+      bt.appendChild(x);
+    });
+    const n = document.createElement('button'); n.type = 'button'; n.className = 'sec'; n.style.marginTop = '4px';
+    n.textContent = 'Commencer un nouveau bon (garder l\'autre)';
+    n.onclick = () => { fond.remove(); resolve(); };
+    bt.appendChild(n);
+    fond.appendChild(bt); document.body.appendChild(fond);
+  });
+}
+// Le client est parti : le bon déjà saisi devient un bon à signer à distance (même contenu, le client signera en ligne)
+function versDistance() {
+  const o = lireBrouillons();
+  const b = capturerBrouillon(true);
+  b.distance = true;
+  const doc = DOC_ID ? '&doc=' + encodeURIComponent(DOC_ID) + '&cd=' + encodeURIComponent(PARAMS.get('cd') || '') + '&client=' + encodeURIComponent(PARAMS.get('client') || '') : '';
+  b.url = 'intervention.html?mode=distance' + doc + (DOC_ID ? '' : '&b=' + encodeURIComponent(BID));
+  o[CLE_CTX] = b;
+  if (!ecrireBrouillons(o)) { b.photos = []; o[CLE_CTX] = b; if (!ecrireBrouillons(o)) { document.getElementById('message').textContent = 'Mémoire de l\'appareil pleine : impossible de transférer le bon.'; return; } }
+  brouillonFerme = true;
+  location.href = b.url;
 }
 
 async function chargerDonnees() {
@@ -395,6 +579,7 @@ function ajouterBande() {
 function supprimerBande(btn) {
   btn.parentElement.remove();   // on peut tout supprimer : un bon sans bande est autorise
   renumeroter();
+  planifier();
 }
 
 function renumeroter() {
@@ -462,7 +647,7 @@ function dessinerPhotos() {
   photos.forEach((p, i) => {
     const d = document.createElement('div'); d.className = 'vig';
     const im = document.createElement('img'); im.src = p; d.appendChild(im);
-    const x = document.createElement('b'); x.innerHTML = Shell.svg('x', 16); x.onclick = () => { photos.splice(i, 1); dessinerPhotos(); }; d.appendChild(x);
+    const x = document.createElement('b'); x.innerHTML = Shell.svg('x', 16); x.onclick = () => { photos.splice(i, 1); dessinerPhotos(); planifier(); }; d.appendChild(x);
     z.appendChild(d);
   });
   const ko = Math.round(photos.reduce((s, p) => s + p.length * 0.75, 0) / 1024);
@@ -477,6 +662,7 @@ async function ajouterPhotos(liste) {
     info.textContent = 'Réduction de la photo...';
     try { photos.push(await compresserPhoto(f)); } catch (e) { info.textContent = 'Photo illisible, essaie-en une autre.'; return; }
     dessinerPhotos();
+    planifier();
   }
 }
 document.getElementById('btnPrendre').onclick = () => document.getElementById('inpPrendre').click();
@@ -527,19 +713,22 @@ async function valider() {
     donnees.urlSigner = new URL('signer.html', location.href).href;
     const libelle = 'Bon à signer : ' + client;
     msg.textContent = 'Envoi du lien au client...';
+    brouillonFerme = true;   // pas de nouvelle sauvegarde du brouillon pendant l'envoi
     try {
       const res = await Nova.envoyerOuGarder('distanceCreer', donnees, libelle, 40000);
+      effacerBrouillon();
       if (res.enAttente) { allerAccueil('attente', 'Bon préparé et gardé sur l\'appareil. Le lien partira chez le client dès que le réseau le permet (bouton « Bons à signer »).'); return; }
       allerAccueil('ok', 'Lien envoyé au client : bon ' + res.numero + ' en attente de signature.' + (res.avertissement ? ' ⚠ ' + res.avertissement : ''));
     } catch (e) {
       if (e.code === 'stop' || e.code === 'limite') {
-        Nova.garderEnFile('distanceCreer', donnees, libelle);
+        Nova.garderEnFile('distanceCreer', donnees, libelle); effacerBrouillon();
         allerAccueil('attente', 'Bon préparé et gardé sur l\'appareil, pas encore envoyé. ' + e.message);
       } else if (e.code === 'session') {
-        Nova.garderEnFile('distanceCreer', donnees, libelle);
+        Nova.garderEnFile('distanceCreer', donnees, libelle); effacerBrouillon();
         allerAccueil('attente', 'Bon préparé et gardé sur l\'appareil. Connecte-toi pour que le lien parte.');
       } else {
         msg.textContent = 'Échec : ' + e.message;
+        brouillonFerme = false;
         btn.disabled = false;
       }
     }
@@ -556,6 +745,7 @@ async function valider() {
     btn.disabled = false;
     return;
   }
+  effacerBrouillon();   // le bon est gardé dans la file d'envoi : le brouillon n'est plus utile
   if (!navigator.onLine) { allerAccueil('attente', 'Bon enregistré sur l\'appareil. Il partira dès que le réseau le permet.'); return; }
 
   // 2. Tentative d'envoi (20 s maximum) ; dans tous les cas on revient ensuite à l'accueil

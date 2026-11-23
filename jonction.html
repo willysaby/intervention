@@ -53,6 +53,7 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 #sugg{display:none;max-height:45vh;overflow-y:auto;border:1px solid var(--line);border-radius:8px;background:var(--card);margin-top:4px}
 #sugg button{display:block;width:100%;text-align:left;padding:13px 12px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:var(--ink)}
 .vide{color:var(--mute);margin-top:24px;text-align:center}
+  .tps { display: flex; gap: 6px; } .tps input { flex: 1; min-width: 0; } .tps select { flex: none; width: 118px; }
 </style>
 </head>
 <body>
@@ -79,7 +80,7 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
       <div><label for="f-ts">Température supérieure</label><input id="f-ts" inputmode="decimal"></div>
       <div><label for="f-ti">Température inférieure</label><input id="f-ti" inputmode="decimal"></div>
       <div><label for="f-pr">Pression</label><input id="f-pr" inputmode="decimal"></div>
-      <div><label for="f-t">Temps</label><input id="f-t" inputmode="decimal"></div>
+      <div><label for="f-t">Temps</label><div class="tps"><input id="f-t" inputmode="decimal"><select id="f-tu" aria-label="Unité du temps"><option value="">Unité ?</option><option value="s">secondes</option><option value="min">minutes</option></select></div></div>
     </div>
     <label for="f-a">Accessoire</label><input id="f-a">
     <label for="f-c">Commentaire</label><textarea id="f-c" rows="3"></textarea>
@@ -109,6 +110,17 @@ const MSG_ADMIN = "Réservé à l’administrateur : déconnecte-toi puis reconn
 let rows = [], maj = "", MATS = [];
 try { const c = JSON.parse(localStorage.getItem("cache") || "null"); if (c) { rows = c.rows; maj = c.maj; } } catch (e) {}
 
+/* Temps : saisi avec son unité (secondes ou minutes) et enregistré sous la forme « 45 s » ou « 2 min » */
+function tempsLire(txt) {
+  const m = String(txt == null ? "" : txt).trim().match(/^(\d+(?:[.,]\d+)?)\s*(s|sec|secs|seconde|secondes|mn|min|mins|minute|minutes)?$/i);
+  if (!m) return {val: String(txt == null ? "" : txt).trim(), unite: "", libre: true};
+  const u = (m[2] || "").toLowerCase();
+  return {val: m[1], unite: !u ? "" : (u[0] === "s" ? "s" : "min"), libre: false};
+}
+// Anciennes valeurs sans unité : considérées en minutes (à corriger en secondes quand ce n'est pas le cas)
+function tempsAffiche(txt) { const t = tempsLire(txt); return !t.libre && t.val && !t.unite ? t.val + " min" : txt; }
+function tempsFormat(val, unite) { val = String(val).trim(); return val && unite && /^\d+(?:[.,]\d+)?$/.test(val) ? val + " " + unite : val; }
+function tempsManque(val, unite) { return /^\d+(?:[.,]\d+)?$/.test(String(val).trim()) && !unite; }
 const norm = s => String(s).toLowerCase().replace(/\s+/g, " ").trim();
 let CODE = "", ADMIN = "";
 try { CODE = localStorage.getItem("code") || ""; ADMIN = localStorage.getItem("admin") || ""; } catch (e) {}
@@ -181,7 +193,7 @@ function cartes() {
         <div><span>Température supérieure</span><b>${vide(r.ts)}</b></div>
         <div><span>Température inférieure</span><b>${vide(r.ti)}</b></div>
         <div><span>Pression</span><b>${vide(r.pr)}</b></div>
-        <div><span>Temps</span><b>${vide(r.t)}</b></div>
+        <div><span>Temps</span><b>${vide(tempsAffiche(r.t))}</b></div>
         <div class="pleine"><span>Accessoire</span><b>${vide(r.a)}</b></div>
         <div class="pleine"><span>Commentaire</span><b>${vide(r.c)}</b></div>
       </div><div class="pied">Validé le ${esc(dateFr(r.d)) || "—"}</div></div>`).join("");
@@ -193,7 +205,7 @@ function tableau() {
   const l = rows.filter(r => !q || [r.m, r.p, r.a, r.c].join(" ").toLowerCase().includes(q))
                 .sort((a, b) => tri(a.m, b.m) || tri(a.p, b.p));
   $("#table").innerHTML = "<tr><th>Matière</th><th>Presse</th><th>T° sup.</th><th>T° inf.</th><th>Pression</th><th>Temps</th><th>Accessoire</th><th>Commentaire</th><th>Date</th></tr>" +
-    l.slice(0, 300).map(r => `<tr${r.n ? ' data-n="' + r.n + '"' : ""}><td>${vide(r.m)}</td><td>${vide(r.p)}</td><td>${vide(r.ts)}</td><td>${vide(r.ti)}</td><td>${vide(r.pr)}</td><td>${vide(r.t)}</td><td>${vide(r.a)}</td><td>${vide(r.c)}</td><td>${esc(dateFr(r.d))}</td></tr>`).join("");
+    l.slice(0, 300).map(r => `<tr${r.n ? ' data-n="' + r.n + '"' : ""}><td>${vide(r.m)}</td><td>${vide(r.p)}</td><td>${vide(r.ts)}</td><td>${vide(r.ti)}</td><td>${vide(r.pr)}</td><td>${vide(tempsAffiche(r.t))}</td><td>${vide(r.a)}</td><td>${vide(r.c)}</td><td>${esc(dateFr(r.d))}</td></tr>`).join("");
   $("#compte").textContent = l.length + " ligne(s)" + (l.length > 300 ? " (300 affichées, affine le filtre)" : "");
 }
 
@@ -218,9 +230,10 @@ function editer(n) {
   if (!ADMIN) { alert(MSG_ADMIN); return; }
   edN = n;
   $("#dlg").innerHTML = "<h2 style='margin:0 0 4px;font-size:18px'>Corriger la ligne</h2>" +
-    CH.map(([k, l]) => `<label for="e-${k}">${l}</label>` + (k === "c" ? `<textarea id="e-${k}" rows="3"></textarea>` : `<input id="e-${k}"${k === "m" ? ' list="l-m"' : k === "p" ? ' list="l-p"' : ""}>`)).join("") +
+    CH.map(([k, l]) => `<label for="e-${k}">${l}</label>` + (k === "c" ? `<textarea id="e-${k}" rows="3"></textarea>` : k === "t" ? '<div class="tps"><input id="e-t" inputmode="decimal"><select id="e-tu"><option value="">Unité ?</option><option value="s">secondes</option><option value="min">minutes</option></select></div>' : `<input id="e-${k}"${k === "m" ? ' list="l-m"' : k === "p" ? ' list="l-p"' : ""}>`)).join("") +
     '<button class="btn" id="e-ok">Enregistrer la correction</button><button class="btn sup" id="e-sup">Supprimer la ligne</button><button class="btn sec" id="e-non">Annuler</button><div id="e-retour" class="pied"></div>';
-  CH.forEach(([k]) => $("#e-" + k).value = r[k] ?? "");
+  CH.forEach(([k]) => { if (k !== "t") $("#e-" + k).value = r[k] ?? ""; });
+  { const t = tempsLire(r.t); $("#e-t").value = t.val; $("#e-tu").value = t.unite || (t.libre || !t.val ? "" : "min"); }
   $("#e-ok").onclick = () => corriger(false);
   $("#e-sup").onclick = () => corriger(true);
   $("#e-non").onclick = () => $("#dlg").close();
@@ -230,6 +243,8 @@ function editer(n) {
 async function corriger(suppr) {
   const r = rows.find(x => x.n === edN), info = $("#e-retour");
   const data = {}; CH.forEach(([k]) => data[k] = $("#e-" + k).value.trim());
+  if (!suppr && tempsManque(data.t, $("#e-tu").value)) { info.textContent = "Choisis l’unité du temps : secondes ou minutes."; return; }
+  data.t = tempsFormat(data.t, $("#e-tu").value);
   if (!suppr && (!data.m || !data.p)) { info.textContent = "La matière et la presse sont obligatoires."; return; }
   if (suppr && !confirm("Supprimer définitivement cette ligne ?")) return;
   info.textContent = "Enregistrement…";
@@ -246,6 +261,8 @@ async function corriger(suppr) {
 async function envoyer() {
   const g = id => $("#f-" + id).value.trim();
   const data = {m:g("m"), p:g("p"), ts:g("ts"), ti:g("ti"), pr:g("pr"), t:g("t"), a:g("a"), c:g("c")};
+  if (tempsManque(data.t, $("#f-tu").value)) { $("#retour").innerHTML = '<div class="msg">Choisis l’unité du temps : secondes ou minutes.</div>'; return; }
+  data.t = tempsFormat(data.t, $("#f-tu").value);
   const retour = $("#retour");
   if (!data.m || !data.p) { retour.innerHTML = '<div class="msg">La matière et la presse sont obligatoires.</div>'; return; }
   $("#envoyer").disabled = true; retour.innerHTML = '<div class="msg">Enregistrement…</div>';
@@ -253,6 +270,7 @@ async function envoyer() {
     const j = await appel({action:"add", data});
     if (!j.ok) throw new Error(j.error);
     ["m","p","ts","ti","pr","t","a","c"].forEach(i => $("#f-" + i).value = "");
+    $("#f-tu").value = "";
     retour.innerHTML = '<div class="msg">Paramètre enregistré.</div>';
     const nouvelle = {n: 0, ...data, d: new Date().toISOString().slice(0, 10)};
     ["m", "p"].forEach(k => { const f = rows.find(x => norm(x[k]) === norm(nouvelle[k])); if (f) nouvelle[k] = f[k]; });
