@@ -34,15 +34,41 @@
   #msg { text-align: center; font-weight: 600; margin: 8px 0; min-height: 1.2em; white-space: pre-line; }
   #msg.ok { color: var(--okink); } #msg.ko { color: var(--koink); }
   .avert { background: var(--warnbg); color: var(--warnink); border-radius: 12px; padding: 10px 14px; font-size: 14px; margin-bottom: 14px; }
+  .tuiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+  @media (min-width: 700px) { .tuiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .tuile { display: block; text-align: left; font-family: inherit; cursor: pointer; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 16px 14px; color: var(--ink); text-decoration: none; min-height: 130px; }
+  .tuile .ic { width: 48px; height: 48px; border-radius: 14px; background: var(--accentbg); color: var(--lien); display: grid; place-items: center; margin-bottom: 12px; }
+  .tuile b { display: block; font-size: 16px; overflow-wrap: break-word; }
+  .tuile .d { display: block; margin-top: 4px; color: var(--mute); font-size: 14px; }
+  .tuile.alerte { border: 2px solid #e0b100; background: var(--warnbg); }
+  .tuile.stop { grid-column: 1 / -1; min-height: 0; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #c62828; border: 2px solid #8e1b1b; color: #fff; }
+  .tuile.stop .ic { background: rgba(255,255,255,.2); color: #fff; margin: 0; flex: none; }
+  .tuile.stop b { font-size: 19px; flex: 1; min-width: 160px; } .tuile.stop .d { color: rgba(255,255,255,.9); width: 100%; margin: 0; }
+  .tuile.stop.confirme { background: #8e1b1b; animation: clig 1s infinite; }
+  .tuile.stop.actif { background: #fff; color: #c62828; border: 3px solid #c62828; } .tuile.stop.actif .ic { background: #c62828; color: #fff; } .tuile.stop.actif .d { color: #8e1b1b; }
+  @keyframes clig { 50% { opacity: .75; } }
 </style>
 </head>
 <body>
 <div class="page" id="page">
-  <div class="haut"><a href="utilisateurs.html">← Utilisateurs</a><h1>Maintenance</h1><button class="btn" id="btnActualiser" type="button">Actualiser</button></div>
-  <div class="avert">Réservé à l'administrateur, pour les essais. Une suppression est définitive. Les emails déjà envoyés restent dans les boîtes de réception : seuls le Sheet et le Drive sont nettoyés.</div>
+  <div class="haut"><a href="index.html" id="retour">← Accueil</a><h1 id="titre">Maintenance</h1><button class="btn" id="btnActualiser" type="button">Actualiser</button></div>
   <div id="msg"></div>
-  <div class="bloc"><h2>Version</h2><p id="versionScript">Lecture de la version du script...</p></div>
 
+  <div id="hub">
+    <div class="bloc"><h2>Version</h2><p id="versionScript">Lecture de la version du script...</p></div>
+    <div class="tuiles">
+      <a class="tuile" href="phrases.html"><span class="ic" data-ic="pen"></span><b>Phrases rapides</b><span class="d">Phrases en un clic du bon</span></a>
+      <a class="tuile" href="utilisateurs.html"><span class="ic" data-ic="users"></span><b>Utilisateurs</b><span class="d">Droits, codes, accès</span></a>
+      <a class="tuile" href="techniciens.html"><span class="ic" data-ic="wrench"></span><b>Techniciens</b><span class="d">Liste et ordre</span></a>
+      <button class="tuile" type="button" data-p="pCompteurs"><span class="ic" data-ic="list"></span><b>Compteurs</b><span class="d" id="dCompteur">N° des bons et limites d'envoi</span></button>
+      <button class="tuile" type="button" data-p="pBons"><span class="ic" data-ic="tag"></span><b>Bons d'intervention</b><span class="d">Supprimer un bon d'essai</span></button>
+      <button class="tuile" type="button" data-p="pAppareils" id="tuileApp"><span class="ic" data-ic="lock"></span><b>Appareils et validations</b><span class="d" id="dAppareils">Validation, migration novafit.fr</span></button>
+      <button class="tuile stop" type="button" id="tuileStop"><span class="ic" data-ic="alert"></span><b id="stopTitre">Stop, on bloque tout</b><span class="d" id="stopInfo">Arrêt d'urgence de tous les envois</span></button>
+    </div>
+    <div class="avert">Réservé à l'administrateur. Une suppression est définitive. Les emails déjà envoyés restent dans les boîtes de réception : seuls le Sheet et le Drive sont nettoyés.</div>
+  </div>
+
+  <div class="panneau" id="pCompteurs" hidden>
   <div class="bloc">
     <h2>Compteur des bons d'intervention</h2>
     <p id="infoCompteur">Chargement...</p>
@@ -52,14 +78,29 @@
     </div>
     <p>Indique le <b>dernier numéro déjà utilisé</b> : le prochain bon portera le numéro suivant. Impossible de descendre sous le numéro d'un bon qui existe encore : supprime-le d'abord.</p>
   </div>
-
+  <div class="bloc">
+    <h2>Limites d'envoi</h2>
+    <p id="infoLimites"></p>
+    <button class="btn" id="btnLimites" type="button">Remettre les limites à zéro</button>
+    <p>Utile après des essais : efface le décompte des envois du jour et de l'heure. L'arrêt d'urgence n'est pas modifié.</p>
+  </div>
+  </div>
+  <div class="panneau" id="pBons" hidden>
   <div class="bloc">
     <h2>Bons d'intervention récents</h2>
     <p>Supprime toute trace d'un bon d'essai : lignes de l'onglet Bons, suivi d'envoi, PDF du bon dans le Drive et bon en attente de signature.</p>
     <label class="opt"><input type="checkbox" id="remettre" checked> Remettre la commande dans « Commande en cours »</label>
     <div id="bons"></div>
   </div>
-
+  </div>
+  <div class="panneau" id="pAppareils" hidden>
+  <div class="bloc">
+    <h2>Appareils</h2>
+    <p id="infoAppareils"></p>
+    <button class="btn" id="btnAppareils" type="button">Valider tous les nouveaux appareils</button>
+    <p>Après la bascule, chacun se reconnecte depuis un appareil qui paraît neuf : au lieu de cliquer sur « C'est bon » un par un, valide-les tous d'un coup. Il n'y a de toute façon aucun blocage lié au nombre d'appareils : seul le voyant orange de l'accueil est concerné.</p>
+  </div>
+    <div class="bloc"><h2>Gérer les appareils par utilisateur</h2><p>Bloquer ou valider un appareil précis, retirer un appareil : depuis la fiche de chaque utilisateur.</p><a class="btn" href="utilisateurs.html">Ouvrir les utilisateurs</a></div>
   <div class="bloc">
     <h2>Migration vers novafit.fr</h2>
     <p>Concerne seulement les gens restés sur l'ancienne adresse (GitHub). Sur la nouvelle adresse, rien ne s'affiche jamais.</p>
@@ -70,19 +111,6 @@
     <p id="infoMigration"></p>
     <p>Nouvelle adresse : <b id="adresseMig"></b> (réglée dans <code>Code.gs</code>, ligne <code>MIGRATION_ADRESSE</code>). Attention : le blocage s'applique aussi à toi sur l'ancienne adresse. Pour le retirer, ouvre la nouvelle adresse et reviens ici.</p>
   </div>
-
-  <div class="bloc">
-    <h2>Appareils</h2>
-    <p id="infoAppareils"></p>
-    <button class="btn" id="btnAppareils" type="button">Valider tous les nouveaux appareils</button>
-    <p>Après la bascule, chacun se reconnecte depuis un appareil qui paraît neuf : au lieu de cliquer sur « C'est bon » un par un, valide-les tous d'un coup. Il n'y a de toute façon aucun blocage lié au nombre d'appareils : seul le voyant orange de l'accueil est concerné.</p>
-  </div>
-
-  <div class="bloc">
-    <h2>Limites d'envoi</h2>
-    <p id="infoLimites"></p>
-    <button class="btn" id="btnLimites" type="button">Remettre les limites à zéro</button>
-    <p>Utile après des essais : efface le décompte des envois du jour et de l'heure. L'arrêt d'urgence n'est pas modifié.</p>
   </div>
 </div>
 
@@ -175,20 +203,69 @@ el('btnAppareils').onclick = async () => {
   catch (e) { msg(e.message, false); }
   charger();
 };
-el('btnActualiser').onclick = charger;
+el('btnActualiser').onclick = () => { charger(); chargerResume(); lireVersion(); };
+
+/* ---------- Navigation : accueil de la maintenance (tuiles) et panneaux ---------- */
+function afficher(id) {
+  document.querySelectorAll('.panneau').forEach(p => { p.hidden = p.id !== id; });
+  el('hub').hidden = !!id;
+  el('titre').textContent = id ? ({ pCompteurs: 'Compteurs', pBons: 'Bons d\'intervention', pAppareils: 'Appareils et validations' })[id] : 'Maintenance';
+  el('retour').textContent = id ? '← Maintenance' : '← Accueil';
+  el('retour').setAttribute('href', id ? '#' : 'index.html');
+  msg('');
+  try { history.replaceState(null, '', id ? '#' + id : location.pathname); } catch (e) {}
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('.tuile[data-p]').forEach(t => { t.onclick = () => afficher(t.getAttribute('data-p')); });
+el('retour').onclick = e => { if (!el('hub').hidden) return; e.preventDefault(); afficher(''); };
+
+/* ---------- Tuile Stop (arrêt d'urgence) : deux appuis pour confirmer ---------- */
+let stopEtat = null, stopConfirme = false, stopMinuteur = null;
+function dessinerStop() {
+  const t = el('tuileStop'), p = stopEtat;
+  t.classList.toggle('actif', !!(p && p.bloque));
+  t.classList.toggle('confirme', stopConfirme);
+  if (!p) return;
+  if (p.bloque) {
+    el('stopTitre').textContent = stopConfirme ? 'Confirmer : réactiver les envois' : '⛔ Envois bloqués : touche pour réactiver';
+    el('stopInfo').textContent = 'Arrêt d\'urgence activé par ' + (p.bloquePar || '?') + (p.bloqueLe ? ' le ' + p.bloqueLe : '');
+  } else {
+    el('stopTitre').textContent = stopConfirme ? 'Confirmer : bloquer tous les envois' : '⛔ Stop, on bloque tout';
+    el('stopInfo').textContent = 'Envois aujourd\'hui : ' + p.jour + ' sur ' + p.plafondJour + ' · maximum ' + p.plafondHeure + ' par heure et par personne';
+  }
+}
+el('tuileStop').onclick = async () => {
+  if (!stopEtat) return;
+  if (!stopConfirme) { stopConfirme = true; dessinerStop(); clearTimeout(stopMinuteur); stopMinuteur = setTimeout(() => { stopConfirme = false; dessinerStop(); }, 5000); return; }
+  stopConfirme = false; clearTimeout(stopMinuteur);
+  try { stopEtat = await Nova.api('usersBloquer', { bloquer: !stopEtat.bloque }, 20000); dessinerStop(); msg(stopEtat.bloque ? 'Envois bloqués.' : 'Envois réactivés.', true); }
+  catch (e) { msg(e.message, false); dessinerStop(); }
+};
+async function chargerResume() {
+  try {
+    const r = await Nova.api('usersResume', null, 15000);
+    stopEtat = r; dessinerStop();
+    const n = r.nouveaux ? r.nouveaux.length : 0;
+    el('tuileApp').classList.toggle('alerte', n > 0);
+    el('dAppareils').textContent = n ? n + ' nouvel' + (n > 1 ? 'aux appareils à valider' : ' appareil à valider') : 'Validation, migration novafit.fr';
+  } catch (e) { /* la tuile Stop reste inactive tant que l'état n'est pas lu */ }
+}
 
 async function lireVersion() {
   try {
     const r = await fetch(window.CONFIG.URL_API); const d = await r.json();
-    el('versionScript').textContent = 'Script Apps Script : ' + (d.version || 'ancienne version (nouvelle version à déployer)') + ' · Page : 2026-11-23-c';
+    el('versionScript').textContent = 'Script Apps Script : ' + (d.version || 'ancienne version (nouvelle version à déployer)') + ' · Page : 2026-11-23-e';
   } catch (e) { el('versionScript').textContent = 'Version du script illisible (réseau).'; }
 }
 if (Nova.exiger('admin')) {
   lireVersion();
+  chargerResume();
+  if (location.hash && document.getElementById(location.hash.slice(1)) && document.getElementById(location.hash.slice(1)).classList.contains('panneau')) afficher(location.hash.slice(1));
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   charger();
 }
 </script>
 <script src="shell.js"></script>
+<script>document.querySelectorAll('.tuile .ic[data-ic]').forEach(function (e) { e.innerHTML = Shell.svg(e.getAttribute('data-ic'), 26); });</script>
 </body>
 </html>

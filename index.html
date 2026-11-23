@@ -82,6 +82,10 @@
   .brouillonLigne { display: flex; gap: 8px; align-items: stretch; margin: 8px 0; }
   .brouillonLigne .brouillon { flex: 1; margin: 0; }
   .brouillonSup { flex: none; padding: 0 14px; border: 1px solid var(--koink); color: var(--koink); background: var(--card); border-radius: 16px; font-weight: 700; font-family: inherit; font-size: 14px; cursor: pointer; }
+  a.gros.maint { background: var(--warnbg); color: var(--warnink); border: 2px solid #e0b100; box-shadow: none; }
+  a.gros.maint .pic { background: rgba(0,0,0,.08); }
+  a.gros.maint.alerte { border-color: #c62828; }
+  a.gros.maint .pastille { background: var(--warnink); color: var(--warnbg); }
 </style>
 </head>
 <body>
@@ -128,7 +132,8 @@
     </section>
     <section class="section" id="secAdmin" hidden>
       <h2>Administration</h2>
-      <div class="grille" id="gridAdmin"><a class="action" href="phrases.html"><div class="puce" id="icPhr"></div><b>Phrases rapides</b><span class="d">Phrases en un clic du bon d'intervention</span></a></div>
+      <a class="gros maint" id="btnMaint" href="maintenance.html"><div class="pic" id="icMaint"></div><div class="tx"><b>Maintenance</b><span id="txtMaint">Phrases, utilisateurs, techniciens, compteurs, appareils</span></div><span class="pastille" id="pastilleMaint" hidden></span><span class="fl" id="flMaint"></span></a>
+      </div>
     </section>
   </div>
 
@@ -273,7 +278,8 @@ function dessiner() {
   document.getElementById('icDist').innerHTML = Shell.svg('pen', 30);
   document.getElementById('flDist').innerHTML = Shell.svg('chevron', 24);
   document.getElementById('btnInter').hidden = !peut('intervention');
-  document.getElementById('icPhr').innerHTML = Shell.svg('pen', 26);
+  document.getElementById('icMaint').innerHTML = Shell.svg('wrench', 30);
+  document.getElementById('flMaint').innerHTML = Shell.svg('chevron', 24);
   document.getElementById('icJonc').innerHTML = Shell.svg('sliders', 30);
   document.getElementById('flJonc').innerHTML = Shell.svg('chevron', 24);
   document.getElementById('icInter').innerHTML = Shell.svg('wrench', 30);
@@ -482,7 +488,6 @@ async function chargerAchats() {
 }
 /* ---------- Utilisateurs (administrateur) : voyant orange en cas de nouvel appareil ---------- */
 function retirerCarteUsers() {
-  const c = document.getElementById('kUsers'); if (c) c.remove();
   document.getElementById('bandeaux').innerHTML = '';
 }
 /* Bandeaux de l'administrateur : rien quand tout va bien ; rouge si l'arrêt d'urgence est actif ; orange si quelqu'un dépasse le seuil d'envois du jour */
@@ -491,7 +496,7 @@ function majBandeaux(r) {
   z.innerHTML = '';
   const ajouter = (cls, titre, detail) => {
     const a = document.createElement('a');
-    a.href = 'utilisateurs.html'; a.className = cls;
+    a.href = 'maintenance.html'; a.className = cls;
     a.textContent = titre;
     if (detail) { const sm = document.createElement('small'); sm.textContent = detail; a.appendChild(sm); }
     z.appendChild(a);
@@ -501,30 +506,16 @@ function majBandeaux(r) {
 }
 async function chargerUsers() {
   if (!peut('admin')) { retirerCarteUsers(); return; }
-  let c = document.getElementById('kUsers');
-  if (!c) {
-    c = document.createElement('div');
-    c.id = 'kUsers';
-    c.className = 'kpi cliquable';
-    c.setAttribute('role', 'link');
-    c.tabIndex = 0;
-    c.innerHTML = '<b>…</b><span class="lib">Utilisateurs actifs</span><span class="aide" hidden></span>';
-    const aller = () => { location.href = 'utilisateurs.html'; };
-    c.onclick = aller;
-    c.onkeydown = e => { if (e.key === 'Enter') aller(); };
-    document.getElementById('gridAdmin').appendChild(c);
-  }
+  const t = document.getElementById('txtMaint'), p = document.getElementById('pastilleMaint'), btn = document.getElementById('btnMaint');
   try {
     const r = await Nova.api('usersResume', null, 10000);
     majBandeaux(r);
-    c.querySelector('b').textContent = r.actifs;
-    const aide = c.querySelector('.aide');
-    c.classList.toggle('alerte', r.nouveaux.length > 0);
-    aide.hidden = false;
-    aide.textContent = r.nouveaux.length
-      ? 'Nouvel appareil : ' + [...new Set(r.nouveaux.map(a => a.nom))].join(', ')
-      : 'Droits, codes et appareils';
-  } catch (e) { c.querySelector('b').textContent = '–'; }
+    const n = r.nouveaux.length;
+    btn.classList.toggle('alerte', n > 0 || !!r.bloque);
+    p.hidden = !(n > 0 || r.bloque);
+    p.textContent = r.bloque ? 'STOP' : String(n);
+    t.textContent = r.bloque ? 'Envois bloqués (arrêt d\'urgence)' : n ? 'Nouvel appareil à valider : ' + [...new Set(r.nouveaux.map(a => a.nom))].join(', ') : 'Phrases, utilisateurs, techniciens, compteurs, appareils';
+  } catch (e) { /* le bouton reste utilisable */ }
 }
 function chargerIndicateurs() {
   chargerAchats();

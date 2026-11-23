@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e9062">
+<title>Techniciens</title>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="commun.css">
+<style>
+  .page { max-width: 760px; }
+  .aide { background: var(--accentbg); color: var(--lien); border-radius: 12px; padding: 10px 14px; font-size: 14px; margin-bottom: 14px; }
+  .phrase { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; }
+  .phrase.off { opacity: .6; }
+  .phrase textarea { width: 100%; box-sizing: border-box; min-height: 52px; padding: 10px 12px; font: inherit; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg, #fff); color: var(--ink); resize: vertical; }
+  .outils { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .outils label { display: flex; gap: 6px; align-items: center; font-size: 14px; font-weight: 600; margin-right: auto; }
+  .outils button { padding: 8px 12px; font-size: 14px; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 10px; font-family: inherit; font-weight: 700; cursor: pointer; }
+  .outils button.sup { color: var(--koink); border-color: var(--koink); }
+  .outils button.sup.sur { background: var(--koink); color: #fff; }
+  .outils button:disabled { opacity: .35; }
+  .actions { position: sticky; bottom: 0; background: var(--bg, #fff); padding: 10px 0 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .actions .btn { flex: 1; min-width: 160px; }
+  #msg { text-align: center; font-weight: 600; margin: 8px 0; min-height: 1.2em; white-space: pre-line; }
+  #msg.ok { color: var(--okink); } #msg.ko { color: var(--koink); }
+  #modif { color: var(--warnink); font-weight: 700; text-align: center; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <div class="haut"><a href="index.html">← Accueil</a><h1>Techniciens</h1><button class="btn" id="btnActualiser" type="button">Actualiser</button></div>
+  <div class="aide">Liste des techniciens proposés sur le bon d'intervention, dans l'ordre ci-dessous (onglet « Techniciens » du Sheet). Écris « Prénom Nom ». Les bons déjà créés ne changent pas. Réservé à l'administrateur : pense à appuyer sur « Enregistrer ».</div>
+  <div id="msg"></div>
+  <div id="liste"></div>
+  <div id="modif"></div>
+  <div class="actions">
+    <button class="btn" id="btnAjouter" type="button">+ Ajouter un technicien</button>
+    <button class="btn vert" id="btnSauver" type="button">Enregistrer</button>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="commun.js"></script>
+<script>
+const el = id => document.getElementById(id);
+function msg(t, ok) { const m = el('msg'); m.textContent = t || ''; m.className = t ? (ok ? 'ok' : 'ko') : ''; }
+let noms = [], modifie = false, occupe = false;
+function marquer(v) { modifie = v; el('modif').textContent = v ? 'Modifications non enregistrées' : ''; }
+
+function dessiner(focus) {
+  const z = el('liste'); z.innerHTML = '';
+  if (!noms.length) { const p = document.createElement('div'); p.className = 'aide'; p.textContent = 'Aucun technicien. Ajoutes-en un avec « + Ajouter un technicien ».'; z.appendChild(p); }
+  noms.forEach((n, i) => {
+    const c = document.createElement('div'); c.className = 'phrase';
+    const t = document.createElement('input'); t.type = 'text'; t.value = n; t.maxLength = 80; t.placeholder = 'Prénom Nom';
+    t.style.cssText = 'width:100%;box-sizing:border-box;padding:12px;font:inherit;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--bg,#fff);color:var(--ink)';
+    t.oninput = () => { noms[i] = t.value; marquer(true); };
+    c.appendChild(t);
+    const o = document.createElement('div'); o.className = 'outils';
+    const bt = (txt, fn, cls, dis) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; if (cls) b.className = cls; b.disabled = !!dis; b.onclick = fn; o.appendChild(b); return b; };
+    const sp = document.createElement('span'); sp.style.marginRight = 'auto'; sp.textContent = (i + 1) + '.'; o.appendChild(sp);
+    bt('↑', () => { noms.splice(i - 1, 0, noms.splice(i, 1)[0]); marquer(true); dessiner(); }, '', i === 0);
+    bt('↓', () => { noms.splice(i + 1, 0, noms.splice(i, 1)[0]); marquer(true); dessiner(); }, '', i === noms.length - 1);
+    let sur = false;
+    const s = bt('Supprimer', () => {
+      if (!sur) { sur = true; s.classList.add('sur'); s.textContent = 'Confirmer'; setTimeout(() => { sur = false; s.classList.remove('sur'); s.textContent = 'Supprimer'; }, 4000); return; }
+      noms.splice(i, 1); marquer(true); dessiner();
+    }, 'sup');
+    c.appendChild(o); z.appendChild(c);
+    if (focus === i) setTimeout(() => { t.focus(); t.scrollIntoView({ block: 'center' }); }, 50);
+  });
+}
+
+async function charger() {
+  if (modifie && !confirm('Des modifications ne sont pas enregistrées. Les abandonner et recharger la liste ?')) return;
+  msg('Chargement...');
+  try { const r = await Nova.api('techAdmin', null, 15000); noms = r.noms.slice(); marquer(false); msg(''); dessiner(); }
+  catch (e) { msg(e.message, false); }
+}
+el('btnAjouter').onclick = () => { noms.push(''); marquer(true); dessiner(noms.length - 1); };
+el('btnSauver').onclick = async () => {
+  if (occupe) return;
+  const propres = noms.map(n => n.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  occupe = true; el('btnSauver').disabled = true; msg('Enregistrement...');
+  try {
+    const r = await Nova.api('techSauver', { noms: propres }, 30000);
+    noms = propres; marquer(false); dessiner();
+    msg(r.nombre + ' technicien' + (r.nombre > 1 ? 's' : '') + ' enregistré' + (r.nombre > 1 ? 's' : '') + '. La liste est prise en compte à la prochaine ouverture d\'un bon.', true);
+  } catch (e) { msg(e.message, false); }
+  occupe = false; el('btnSauver').disabled = false;
+};
+el('btnActualiser').onclick = charger;
+window.addEventListener('beforeunload', e => { if (modifie) { e.preventDefault(); e.returnValue = ''; } });
+
+if (Nova.exiger('admin')) {
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  charger();
+}
+</script>
+<script src="shell.js"></script>
+</body>
+</html>
