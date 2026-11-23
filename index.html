@@ -125,7 +125,7 @@
     </section>
     <section class="section" id="secAdmin" hidden>
       <h2>Administration</h2>
-      <div class="grille" id="gridAdmin"></div>
+      <div class="grille" id="gridAdmin"><a class="action" href="phrases.html"><div class="puce" id="icPhr"></div><b>Phrases rapides</b><span class="d">Phrases en un clic du bon d'intervention</span></a></div>
     </section>
   </div>
 
@@ -270,6 +270,7 @@ function dessiner() {
   document.getElementById('icDist').innerHTML = Shell.svg('pen', 30);
   document.getElementById('flDist').innerHTML = Shell.svg('chevron', 24);
   document.getElementById('btnInter').hidden = !peut('intervention');
+  document.getElementById('icPhr').innerHTML = Shell.svg('pen', 26);
   document.getElementById('icJonc').innerHTML = Shell.svg('sliders', 30);
   document.getElementById('flJonc').innerHTML = Shell.svg('chevron', 24);
   document.getElementById('icInter').innerHTML = Shell.svg('wrench', 30);
