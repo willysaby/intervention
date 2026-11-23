@@ -70,10 +70,10 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
     <div class="tableau"><table id="table"></table></div>
     <p class="pied" id="compte"></p>
     <p class="pied">Touche une ligne pour la corriger (code administrateur).</p>
-    <div id="outilUnites" hidden style="margin-top:14px;padding:14px;border:2px solid #e0b100;border-radius:14px;background:var(--warnbg,#fff3cd);color:var(--warnink,#5c4400)">
-      <b>Initialiser les unités de temps</b>
+    <div id="outilUnites" style="margin-top:14px;padding:14px;border:2px solid #e0b100;border-radius:14px;background:var(--warnbg,#fff3cd);color:var(--warnink,#5c4400)">
+      <b>Uniformiser les temps (s / min)</b>
       <p class="pied" id="infoUnites" style="margin:6px 0 10px"></p>
-      <button class="btn" id="btnUnites" type="button">Passer toutes les fiches en « min »</button>
+      <button class="btn" id="btnUnites" type="button">Mettre tous les temps au même format</button>
       <div id="avanceUnites" class="pied" style="margin-top:8px"></div>
     </div>
   </section>
@@ -118,7 +118,7 @@ try { const c = JSON.parse(localStorage.getItem("cache") || "null"); if (c) { ro
 
 /* Temps : saisi avec son unité (secondes ou minutes) et enregistré sous la forme « 45 s » ou « 2 min » */
 function tempsLire(txt) {
-  const m = String(txt == null ? "" : txt).trim().match(/^(\d+(?:[.,]\d+)?)\s*(s|sec|secs|seconde|secondes|mn|min|mins|minute|minutes)?$/i);
+  const m = String(txt == null ? "" : txt).trim().match(/^(\d+(?:[.,]\d+)?)\s*(s|sec|secs|seconde|secondes|mn|min|mins|minute|minutes)?\.?$/i);
   if (!m) return {val: String(txt == null ? "" : txt).trim(), unite: "", libre: true};
   const u = (m[2] || "").toLowerCase();
   return {val: m[1], unite: !u ? "" : (u[0] === "s" ? "s" : "min"), libre: false};
@@ -266,18 +266,24 @@ async function corriger(suppr) {
 
 /* Outil administrateur : les anciennes fiches ont un temps sans unité (ex. « 3 ») ; on les enregistre en minutes (« 3 min »)
    sans toucher aux autres valeurs. Les fiches déjà corrigées en secondes ou en minutes ne sont pas modifiées. */
-function sansUnite() { return rows.filter(r => { const t = tempsLire(r.t); return !t.libre && t.val && !t.unite; }); }
+// Forme propre : « 45 s » ou « 5 min » (nombre, espace, unité en minuscules). Sans unité = minutes.
+function formeCorrecte(t) { return t.val + " " + (t.unite || "min"); }
+function sansUnite() { return rows.filter(r => { const t = tempsLire(r.t); return !t.libre && t.val && String(r.t).trim() !== formeCorrecte(t); }); }
+function tempsLibres() { return rows.filter(r => { const t = tempsLire(r.t); return t.libre && t.val; }); }
 function majOutilUnites() {
-  const n = sansUnite().length, z = $("#outilUnites");
-  z.hidden = !(ADMIN && n > 0);
-  if (!z.hidden) $("#infoUnites").textContent = n + " fiche" + (n > 1 ? "s ont" : " a") + " un temps sans unité (affiché en minutes). Ce bouton les enregistre en « min » sans rien changer d’autre ; corrige ensuite à la main celles qui sont en secondes.";
+  const n = sansUnite().length, l = tempsLibres().length;
+  const info = $("#infoUnites"), bt = $("#btnUnites");
+  const version = " (page 2026-11-23-f, " + rows.length + " fiches lues)";
+  if (!ADMIN) { info.textContent = "Réservé à l’administrateur : déconnecte-toi puis reconnecte-toi depuis l’accueil avec le code administrateur de la jonction." + version; bt.hidden = true; return; }
+  bt.hidden = n === 0;
+  info.textContent = (n ? n + " fiche" + (n > 1 ? "s ont" : " a") + " un temps à remettre au même format (« 45 s » ou « 5 min » : majuscules, SEC, MIN, sans espace, sans unité…). Les valeurs ne changent pas ; sans unité = minutes." : "Tous les temps sont déjà au bon format.") + (l ? " " + l + " fiche" + (l > 1 ? "s ont" : " a") + " un temps en texte libre (ex. « 1h30 ») : non modifiée" + (l > 1 ? "s" : "") + "." : "") + version;
 }
 let unitesEnCours = false;
 async function initialiserUnites() {
   if (unitesEnCours) return;
   const liste = sansUnite();
   if (!liste.length) return;
-  if (!confirm("Enregistrer " + liste.length + " fiche(s) avec l’unité « min » ? Les autres valeurs ne changent pas.")) return;
+  if (!confirm("Remettre " + liste.length + " temps au format « 45 s » / « 5 min » ? Les valeurs ne changent pas (sans unité = minutes), les autres champs non plus.")) return;
   unitesEnCours = true; $("#btnUnites").disabled = true;
   const av = $("#avanceUnites"); let fait = 0;
   try {
@@ -285,13 +291,13 @@ async function initialiserUnites() {
       av.textContent = "Enregistrement… " + fait + " / " + liste.length + " (ne ferme pas la page)";
       const t = tempsLire(r.t);
       const data = {}; CH.forEach(([k]) => data[k] = String(r[k] ?? "").trim());
-      data.t = t.val + " min";
+      data.t = formeCorrecte(t);
       const j = await appel({action: "edit", row: r.n, orig: {m: r.m, p: r.p}, data});
       if (!j.ok) throw new Error(j.error === "noadmin" ? MSG_ADMIN : (j.error || "erreur"));
       r.t = data.t; fait++;
       await new Promise(x => setTimeout(x, 250));
     }
-    av.textContent = fait + " fiche" + (fait > 1 ? "s" : "") + " enregistrée" + (fait > 1 ? "s" : "") + " en minutes.";
+    av.textContent = fait + " fiche" + (fait > 1 ? "s" : "") + " mise" + (fait > 1 ? "s" : "") + " au même format.";
   } catch (e) {
     av.textContent = "Arrêt après " + fait + " / " + liste.length + " : " + (e.message === "noadmin" ? MSG_ADMIN : e.message) + ". Relance le bouton pour continuer (les fiches déjà faites sont ignorées).";
   }
