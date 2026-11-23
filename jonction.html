@@ -70,6 +70,12 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
     <div class="tableau"><table id="table"></table></div>
     <p class="pied" id="compte"></p>
     <p class="pied">Touche une ligne pour la corriger (code administrateur).</p>
+    <div id="outilUnites" hidden style="margin-top:14px;padding:14px;border:2px solid #e0b100;border-radius:14px;background:var(--warnbg,#fff3cd);color:var(--warnink,#5c4400)">
+      <b>Initialiser les unités de temps</b>
+      <p class="pied" id="infoUnites" style="margin:6px 0 10px"></p>
+      <button class="btn" id="btnUnites" type="button">Passer toutes les fiches en « min »</button>
+      <div id="avanceUnites" class="pied" style="margin-top:8px"></div>
+    </div>
   </section>
   <section id="s-ajout">
     <div id="hors" class="msg" style="display:none">Connexion requise pour enregistrer un paramètre.</div>
@@ -169,7 +175,7 @@ function rendre() {
   MATS = mats;
   $("#l-m").innerHTML = mats.map(m => `<option value="${esc(m)}">`).join("");
   $("#l-p").innerHTML = [...new Set(rows.map(r => r.p))].sort(tri).map(p => `<option value="${esc(p)}">`).join("");
-  cartes(); tableau();
+  cartes(); tableau(); majOutilUnites();
 }
 
 function suggerer() {
@@ -257,6 +263,42 @@ async function corriger(suppr) {
     if (e.message === "obsolete") synchro();
   }
 }
+
+/* Outil administrateur : les anciennes fiches ont un temps sans unité (ex. « 3 ») ; on les enregistre en minutes (« 3 min »)
+   sans toucher aux autres valeurs. Les fiches déjà corrigées en secondes ou en minutes ne sont pas modifiées. */
+function sansUnite() { return rows.filter(r => { const t = tempsLire(r.t); return !t.libre && t.val && !t.unite; }); }
+function majOutilUnites() {
+  const n = sansUnite().length, z = $("#outilUnites");
+  z.hidden = !(ADMIN && n > 0);
+  if (!z.hidden) $("#infoUnites").textContent = n + " fiche" + (n > 1 ? "s ont" : " a") + " un temps sans unité (affiché en minutes). Ce bouton les enregistre en « min » sans rien changer d’autre ; corrige ensuite à la main celles qui sont en secondes.";
+}
+let unitesEnCours = false;
+async function initialiserUnites() {
+  if (unitesEnCours) return;
+  const liste = sansUnite();
+  if (!liste.length) return;
+  if (!confirm("Enregistrer " + liste.length + " fiche(s) avec l’unité « min » ? Les autres valeurs ne changent pas.")) return;
+  unitesEnCours = true; $("#btnUnites").disabled = true;
+  const av = $("#avanceUnites"); let fait = 0;
+  try {
+    for (const r of liste) {
+      av.textContent = "Enregistrement… " + fait + " / " + liste.length + " (ne ferme pas la page)";
+      const t = tempsLire(r.t);
+      const data = {}; CH.forEach(([k]) => data[k] = String(r[k] ?? "").trim());
+      data.t = t.val + " min";
+      const j = await appel({action: "edit", row: r.n, orig: {m: r.m, p: r.p}, data});
+      if (!j.ok) throw new Error(j.error === "noadmin" ? MSG_ADMIN : (j.error || "erreur"));
+      r.t = data.t; fait++;
+      await new Promise(x => setTimeout(x, 250));
+    }
+    av.textContent = fait + " fiche" + (fait > 1 ? "s" : "") + " enregistrée" + (fait > 1 ? "s" : "") + " en minutes.";
+  } catch (e) {
+    av.textContent = "Arrêt après " + fait + " / " + liste.length + " : " + (e.message === "noadmin" ? MSG_ADMIN : e.message) + ". Relance le bouton pour continuer (les fiches déjà faites sont ignorées).";
+  }
+  unitesEnCours = false; $("#btnUnites").disabled = false;
+  await synchro();
+}
+$("#btnUnites").onclick = initialiserUnites;
 
 async function envoyer() {
   const g = id => $("#f-" + id).value.trim();
