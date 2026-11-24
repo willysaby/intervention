@@ -599,6 +599,13 @@ function majCommentaireAuto() {
   }
 }
 
+/* Un appui dans le commentaire prérempli sélectionne tout le texte (taper remplace, ou « Suppr » l'efface) ;
+   dès que le texte a été modifié, l'appui place le curseur normalement. */
+document.getElementById('commentaire').addEventListener('focus', function () {
+  const z = this;
+  if (z.value && z.value === commentaireAuto) setTimeout(() => { try { z.select(); z.setSelectionRange(0, z.value.length); } catch (e) {} }, 30);
+});
+
 /* ---------- Signature ---------- */
 const canvas = document.getElementById('sign');
 const ctx = canvas.getContext('2d');

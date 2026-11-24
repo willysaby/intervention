@@ -85,6 +85,9 @@
   a.gros.maint { background: var(--warnbg); color: var(--warnink); border: 2px solid #e0b100; box-shadow: none; }
   a.gros.maint .pic { background: rgba(0,0,0,.08); }
   a.gros.maint.alerte { border-color: #c62828; }
+  a.gros.jaune { background: var(--warnbg); color: var(--warnink); border: 2px solid #e0b100; box-shadow: none; }
+  a.gros.jaune .pic { background: rgba(0,0,0,.08); }
+  a.gros.jaune .pastille { background: var(--warnink); color: var(--warnbg); }
   a.gros.maint .pastille { background: var(--warnink); color: var(--warnbg); }
 </style>
 </head>
@@ -108,7 +111,7 @@
   <div id="contenu" hidden>
     <section class="section" id="secJonc" hidden>
       <h2>Jonction</h2>
-      <a class="gros" href="jonction.html"><div class="pic" id="icJonc"></div><div class="tx"><b>Fiche de jonction</b><span>Réglage et contrôle des jonctions</span></div><span class="fl" id="flJonc"></span></a>
+      <a class="gros" id="btnJonc" href="jonction.html"><div class="pic" id="icJonc"></div><div class="tx"><b>Fiche de jonction</b><span>Réglage et contrôle des jonctions</span></div><span class="pastille" id="pastilleJonc" hidden></span><span class="fl" id="flJonc"></span></a>
     </section>
     <section class="section" id="secInter">
       <h2>Intervention</h2>
@@ -510,6 +513,10 @@ async function chargerUsers() {
   try {
     const r = await Nova.api('usersResume', null, 10000);
     majBandeaux(r);
+    const nj = r.propositions || 0, bj = document.getElementById('btnJonc'), pj = document.getElementById('pastilleJonc'), tj = bj.querySelector('.tx span');
+    if (!bj.dataset.texte) bj.dataset.texte = tj.textContent;
+    bj.classList.toggle('jaune', nj > 0); pj.hidden = !(nj > 0); pj.textContent = String(nj);
+    tj.textContent = nj > 0 ? nj + ' proposition' + (nj > 1 ? 's' : '') + ' à examiner' : bj.dataset.texte;
     const n = r.nouveaux.length;
     btn.classList.toggle('alerte', n > 0 || !!r.bloque);
     p.hidden = !(n > 0 || r.bloque);

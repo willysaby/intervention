@@ -53,6 +53,14 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 #sugg{display:none;max-height:45vh;overflow-y:auto;border:1px solid var(--line);border-radius:8px;background:var(--card);margin-top:4px}
 #sugg button{display:block;width:100%;text-align:left;padding:13px 12px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:var(--ink)}
 .vide{color:var(--mute);margin-top:24px;text-align:center}
+  [hidden] { display:none !important; }
+  .prop { margin-top:12px; padding:12px; border:2px solid #e0b100; border-radius:12px; background:var(--card); }
+  .prop h3 { margin:0 0 6px; font-size:16px; } .prop .qui { font-size:12px; color:var(--mute); margin-bottom:8px; }
+  .prop table { width:100%; font-size:14px; white-space:normal; } .prop td, .prop th { padding:4px 6px; }
+  .prop .chg { background:var(--warnbg,#fff3cd); color:var(--warnink,#5c4400); font-weight:650; }
+  .prop .anc { text-decoration:line-through; color:var(--mute); }
+  .prop .acts { display:flex; gap:8px; margin-top:10px; } .prop .acts .btn { margin-top:0; padding:11px 6px; }
+  .navpast { background:#e0b100; color:#3a2c00; border-radius:999px; font-size:11px; font-weight:800; padding:1px 6px; margin-left:4px; }
   .tps { display: flex; gap: 6px; } .tps input { flex: 1; min-width: 0; } .tps select { flex: none; width: 118px; }
 </style>
 </head>
@@ -70,7 +78,7 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
     <div class="tableau"><table id="table"></table></div>
     <p class="pied" id="compte"></p>
     <p class="pied">Touche une ligne pour la corriger (code administrateur).</p>
-    <div id="outilUnites" style="margin-top:14px;padding:14px;border:2px solid #e0b100;border-radius:14px;background:var(--warnbg,#fff3cd);color:var(--warnink,#5c4400)">
+    <div id="outilUnites" hidden style="margin-top:14px;padding:14px;border:2px solid #e0b100;border-radius:14px;background:var(--warnbg,#fff3cd);color:var(--warnink,#5c4400)">
       <b>Uniformiser les temps (s / min)</b>
       <p class="pied" id="infoUnites" style="margin:6px 0 10px"></p>
       <button class="btn" id="btnUnites" type="button">Mettre tous les temps au même format</button>
@@ -93,16 +101,22 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
     <button class="btn" id="envoyer">Enregistrer le paramètre</button>
     <div id="retour"></div>
   </section>
+  <section id="s-prop">
+    <p class="pied" style="margin-top:0">Propositions envoyées par l’équipe : rien n’est enregistré dans la base tant qu’un administrateur ne les a pas validées.</p>
+    <div id="listeProp"></div>
+  </section>
 </main>
 <dialog id="dlg"></dialog>
 <nav class="barreOnglets">
   <button type="button" data-s="s-rech" class="on"><span data-ic="search"></span><span>Recherche</span></button>
   <button type="button" data-s="s-base"><span data-ic="list"></span><span>Base</span></button>
   <a href="./" id="navAccueil"><span data-ic="home"></span><span>Accueil</span></a>
-  <button type="button" data-s="s-ajout"><span data-ic="plus"></span><span>Ajout</span></button>
+  <button type="button" data-s="s-ajout"><span data-ic="plus"></span><span id="libAjout">Ajout</span></button>
+  <button type="button" data-s="s-prop" id="navProp" hidden><span data-ic="list"></span><span>À valider<span class="navpast" id="navPast" hidden></span></span></button>
 </nav>
 
 <script src="config.js"></script>
+<script src="commun.js"></script>
 <script>
 const API_URL = (window.CONFIG && window.CONFIG.URL_JONCTION) || "";
 
@@ -143,9 +157,14 @@ function etat() {
   const e = $("#etat"), off = !navigator.onLine;
   e.className = off ? "off" : "";
   e.textContent = (off ? "Hors ligne · " : "") + (maj ? "Dernière mise à jour de la base : " + maj : "Base non synchronisée");
-  $("#envoyer").disabled = off || !ADMIN;
-  $("#hors").style.display = (off || !ADMIN) ? "block" : "none";
-  $("#hors").textContent = off ? "Connexion requise pour enregistrer un paramètre." : MSG_ADMIN;
+  const peutProposer = !!ADMIN || (window.Nova && Nova.peut("jonction"));
+  $("#envoyer").disabled = off || !peutProposer;
+  $("#envoyer").textContent = ADMIN ? "Enregistrer le paramètre" : "Proposer ce paramètre";
+  $("#libAjout").textContent = ADMIN ? "Ajout" : "Proposer";
+  $("#hors").style.display = (off || !peutProposer || !ADMIN) ? "block" : "none";
+  $("#hors").textContent = off ? "Connexion requise pour enregistrer un paramètre." : !peutProposer ? MSG_ADMIN : "Tu n’es pas administrateur : ton paramètre sera envoyé comme proposition et validé par un administrateur.";
+  const adm = !!ADMIN && window.Nova && Nova.peut("admin");
+  $("#navProp").hidden = !adm;
 }
 
 async function synchro() {
@@ -233,15 +252,15 @@ function editer(n) {
   if (!navigator.onLine) { alert("Connexion requise pour corriger une ligne."); return; }
   const r = rows.find(x => x.n === n);
   if (!r) return;
-  if (!ADMIN) { alert(MSG_ADMIN); return; }
+  if (!ADMIN && !Nova.peut("jonction")) { alert(MSG_ADMIN); return; }
   edN = n;
   $("#dlg").innerHTML = "<h2 style='margin:0 0 4px;font-size:18px'>Corriger la ligne</h2>" +
     CH.map(([k, l]) => `<label for="e-${k}">${l}</label>` + (k === "c" ? `<textarea id="e-${k}" rows="3"></textarea>` : k === "t" ? '<div class="tps"><input id="e-t" inputmode="decimal"><select id="e-tu"><option value="">Unité ?</option><option value="s">secondes</option><option value="min">minutes</option></select></div>' : `<input id="e-${k}"${k === "m" ? ' list="l-m"' : k === "p" ? ' list="l-p"' : ""}>`)).join("") +
-    '<button class="btn" id="e-ok">Enregistrer la correction</button><button class="btn sup" id="e-sup">Supprimer la ligne</button><button class="btn sec" id="e-non">Annuler</button><div id="e-retour" class="pied"></div>';
+    '<button class="btn" id="e-ok">' + (ADMIN ? "Enregistrer la correction" : "Proposer cette modification") + '</button>' + (ADMIN ? '<button class="btn sup" id="e-sup">Supprimer la ligne</button>' : "") + '<button class="btn sec" id="e-non">Annuler</button><div id="e-retour" class="pied"></div>';
   CH.forEach(([k]) => { if (k !== "t") $("#e-" + k).value = r[k] ?? ""; });
   { const t = tempsLire(r.t); $("#e-t").value = t.val; $("#e-tu").value = t.unite || (t.libre || !t.val ? "" : "min"); }
   $("#e-ok").onclick = () => corriger(false);
-  $("#e-sup").onclick = () => corriger(true);
+  if (ADMIN) $("#e-sup").onclick = () => corriger(true);
   $("#e-non").onclick = () => $("#dlg").close();
   $("#dlg").showModal();
 }
@@ -252,6 +271,17 @@ async function corriger(suppr) {
   if (!suppr && tempsManque(data.t, $("#e-tu").value)) { info.textContent = "Choisis l’unité du temps : secondes ou minutes."; return; }
   data.t = tempsFormat(data.t, $("#e-tu").value);
   if (!suppr && (!data.m || !data.p)) { info.textContent = "La matière et la presse sont obligatoires."; return; }
+  if (!ADMIN) {
+    const ancien = {}; CH.forEach(([k]) => ancien[k] = String(r[k] ?? "").trim());
+    const canon = t => { const x = tempsLire(t); return x.libre ? String(t ?? "").trim() : x.val + " " + (x.unite || "min"); };
+    if (CH.every(([k]) => k === "t" ? canon(ancien.t) === canon(data.t) : ancien[k] === data[k])) { info.textContent = "Rien n’a changé."; return; }
+    info.textContent = "Envoi…";
+    try {
+      await Nova.api("jonctionPropose", {prop: {type: "modif", n: edN, ancien, nouveau: data}}, 30000);
+      $("#dlg").close(); alert("Proposition envoyée : un administrateur va l’examiner.");
+    } catch (e) { info.textContent = "Échec de l’envoi : " + e.message; }
+    return;
+  }
   if (suppr && !confirm("Supprimer définitivement cette ligne ?")) return;
   info.textContent = "Enregistrement…";
   try {
@@ -273,7 +303,8 @@ function tempsLibres() { return rows.filter(r => { const t = tempsLire(r.t); ret
 function majOutilUnites() {
   const n = sansUnite().length, l = tempsLibres().length;
   const info = $("#infoUnites"), bt = $("#btnUnites");
-  const version = " (page 2026-11-23-f, " + rows.length + " fiches lues)";
+  const version = " (page 2026-11-24-a, " + rows.length + " fiches lues)";
+  $("#outilUnites").hidden = !(ADMIN && (n > 0 || l > 0));   // cadre visible seulement s'il y a quelque chose à faire
   if (!ADMIN) { info.textContent = "Réservé à l’administrateur : déconnecte-toi puis reconnecte-toi depuis l’accueil avec le code administrateur de la jonction." + version; bt.hidden = true; return; }
   bt.hidden = n === 0;
   info.textContent = (n ? n + " fiche" + (n > 1 ? "s ont" : " a") + " un temps à remettre au même format (« 45 s » ou « 5 min » : majuscules, SEC, MIN, sans espace, sans unité…). Les valeurs ne changent pas ; sans unité = minutes." : "Tous les temps sont déjà au bon format.") + (l ? " " + l + " fiche" + (l > 1 ? "s ont" : " a") + " un temps en texte libre (ex. « 1h30 ») : non modifiée" + (l > 1 ? "s" : "") + "." : "") + version;
@@ -314,6 +345,15 @@ async function envoyer() {
   const retour = $("#retour");
   if (!data.m || !data.p) { retour.innerHTML = '<div class="msg">La matière et la presse sont obligatoires.</div>'; return; }
   $("#envoyer").disabled = true; retour.innerHTML = '<div class="msg">Enregistrement…</div>';
+  if (!ADMIN) {
+    try {
+      await Nova.api("jonctionPropose", {prop: {type: "nouveau", nouveau: data}}, 30000);
+      ["m","p","ts","ti","pr","t","a","c"].forEach(i => $("#f-" + i).value = "");
+      $("#f-tu").value = "";
+      retour.innerHTML = '<div class="msg">Proposition envoyée : un administrateur va l’examiner.</div>';
+    } catch (e) { retour.innerHTML = '<div class="msg">Échec de l’envoi : ' + esc(e.message) + "</div>"; }
+    etat(); return;
+  }
   try {
     const j = await appel({action:"add", data});
     if (!j.ok) throw new Error(j.error);
@@ -332,6 +372,79 @@ async function envoyer() {
   etat();
 }
 
+/* ---------- Propositions (administrateurs) ---------- */
+let PROPS = [];
+const estAdmin = () => !!ADMIN && window.Nova && Nova.peut("admin");
+function ligneProp(p) {
+  const nou = p.nouveau || {}, anc = p.ancien;
+  const lignes = CH.map(([k, l]) => {
+    const n = k === "t" ? tempsAffiche(nou[k]) : nou[k], a = anc ? (k === "t" ? tempsAffiche(anc[k]) : anc[k]) : "";
+    const change = anc ? String(n ?? "") !== String(a ?? "") : !!n;
+    return `<tr><th>${l}</th><td${change ? ' class="chg"' : ""}>${anc && change ? '<span class="anc">' + vide(a) + "</span> → " : ""}${vide(n)}</td></tr>`;
+  }).join("");
+  const d = (p.date || "").slice(0, 10);
+  return `<div class="prop" data-id="${esc(p.id)}"><h3>${p.type === "modif" ? "Modification d’une fiche" : "Nouveau paramètre"}</h3>
+    <div class="qui">Proposé par ${esc(p.auteur)}${d ? " le " + esc(dateFr(d)) : ""}</div><table>${lignes}</table>
+    <div class="acts"><button class="btn" data-a="ok">Valider</button><button class="btn sec" data-a="cor">Corriger</button><button class="btn sup" data-a="no">Refuser</button></div>
+    <div class="pied" data-r></div></div>`;
+}
+function dessinerProps(msg) {
+  $("#listeProp").innerHTML = (msg ? '<div class="msg">' + esc(msg) + "</div>" : "") + (PROPS.length ? PROPS.map(ligneProp).join("") : '<p class="vide">Aucune proposition en attente.</p>');
+  const nb = $("#navPast"); nb.hidden = !PROPS.length; nb.textContent = PROPS.length;
+}
+async function chargerProps(msg) {
+  if (!estAdmin() || !navigator.onLine) return;
+  try { PROPS = (await Nova.api("jonctionPropositions", null, 15000)).propositions || []; dessinerProps(msg); } catch (e) { /* on garde l'affichage */ }
+}
+function mess(id, t) { const e = document.querySelector('.prop[data-id="' + id + '"] [data-r]'); if (e) e.textContent = t; }
+async function traiter(id, data) {
+  const p = PROPS.find(x => x.id === id); if (!p) return;
+  if (!ADMIN) { mess(id, MSG_ADMIN); return; }
+  mess(id, "Traitement…");
+  try { await Nova.api("jonctionPrendre", {id}, 20000); }
+  catch (e) { await chargerProps(e.code === "deja" ? "Cette proposition a déjà été traitée par un autre administrateur." : "Échec : " + e.message); return; }
+  const fin = data || {...p.nouveau};
+  fin.t = tempsFormat(tempsAffiche(fin.t), "") || fin.t;
+  try {
+    const j = p.type === "modif" ? await appel({action:"edit", row: p.n, orig: {m: p.ancien.m, p: p.ancien.p}, data: fin}) : await appel({action:"add", data: fin});
+    if (!j.ok) throw new Error(j.error === "obsolete" ? "la fiche a changé entre-temps" : (j.error || "erreur"));
+  } catch (e) {
+    try { await Nova.api("jonctionFinir", {id, issue: "rouvrir"}, 20000); } catch (x) {}
+    await chargerProps("Non enregistrée dans la base (" + (e.message === "noadmin" ? MSG_ADMIN : e.message) + "). La proposition reste en attente.");
+    synchro(); return;
+  }
+  try { await Nova.api("jonctionFinir", {id, issue: "validee", data: fin}, 20000); } catch (e) {}
+  await chargerProps("Proposition validée et enregistrée dans la base.");
+  synchro();
+}
+async function refuser(id) {
+  if (!confirm("Refuser cette proposition ?")) return;
+  try { await Nova.api("jonctionFinir", {id, issue: "refusee"}, 20000); await chargerProps("Proposition refusée."); }
+  catch (e) { await chargerProps(e.code === "deja" ? "Cette proposition a déjà été traitée par un autre administrateur." : "Échec : " + e.message); }
+}
+function corrigerProp(id) {
+  const p = PROPS.find(x => x.id === id); if (!p) return;
+  $("#dlg").innerHTML = "<h2 style='margin:0 0 4px;font-size:18px'>Corriger avant de valider</h2>" +
+    CH.map(([k, l]) => `<label for="e-${k}">${l}</label>` + (k === "c" ? `<textarea id="e-${k}" rows="3"></textarea>` : k === "t" ? '<div class="tps"><input id="e-t" inputmode="decimal"><select id="e-tu"><option value="">Unité ?</option><option value="s">secondes</option><option value="min">minutes</option></select></div>' : `<input id="e-${k}"${k === "m" ? ' list="l-m"' : k === "p" ? ' list="l-p"' : ""}>`)).join("") +
+    '<button class="btn" id="e-ok">Valider avec ces corrections</button><button class="btn sec" id="e-non">Annuler</button><div id="e-retour" class="pied"></div>';
+  CH.forEach(([k]) => { if (k !== "t") $("#e-" + k).value = p.nouveau[k] ?? ""; });
+  { const t = tempsLire(p.nouveau.t); $("#e-t").value = t.val; $("#e-tu").value = t.unite || (t.libre || !t.val ? "" : "min"); }
+  $("#e-non").onclick = () => $("#dlg").close();
+  $("#e-ok").onclick = () => {
+    const data = {}; CH.forEach(([k]) => data[k] = $("#e-" + k).value.trim());
+    if (tempsManque(data.t, $("#e-tu").value)) { $("#e-retour").textContent = "Choisis l’unité du temps : secondes ou minutes."; return; }
+    data.t = tempsFormat(data.t, $("#e-tu").value);
+    if (!data.m || !data.p) { $("#e-retour").textContent = "La matière et la presse sont obligatoires."; return; }
+    $("#dlg").close(); traiter(id, data);
+  };
+  $("#dlg").showModal();
+}
+$("#listeProp").onclick = e => {
+  const b = e.target.closest("button[data-a]"); if (!b) return;
+  const id = b.closest(".prop").dataset.id;
+  if (b.dataset.a === "ok") traiter(id); else if (b.dataset.a === "cor") corrigerProp(id); else refuser(id);
+};
+
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav button, section").forEach(x => x.classList.remove("on"));
   b.classList.add("on"); $("#" + b.dataset.s).classList.add("on");
@@ -349,10 +462,10 @@ $("#envoyer").onclick = envoyer;
 $("#table").onclick = e => { const tr = e.target.closest("tr[data-n]"); if (tr) editer(+tr.dataset.n); };
 addEventListener("online", synchro);
 addEventListener("offline", etat);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) synchro(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { synchro(); chargerProps(); } });
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
-rendre(); synchro();
+rendre(); synchro(); etat(); chargerProps();
 </script>
 <script src="shell.js"></script>
 </body>
