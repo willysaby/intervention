@@ -61,7 +61,6 @@
       <a class="tuile" href="utilisateurs.html"><span class="ic" data-ic="users"></span><b>Utilisateurs</b><span class="d">Droits, codes, accès</span></a>
       <a class="tuile" href="techniciens.html"><span class="ic" data-ic="wrench"></span><b>Techniciens</b><span class="d">Liste et ordre</span></a>
       <button class="tuile" type="button" data-p="pCompteurs"><span class="ic" data-ic="list"></span><b>Compteurs</b><span class="d" id="dCompteur">N° des bons et limites d'envoi</span></button>
-      <button class="tuile" type="button" data-p="pBons"><span class="ic" data-ic="tag"></span><b>Bons d'intervention</b><span class="d">Supprimer un bon d'essai</span></button>
       <button class="tuile" type="button" data-p="pAppareils" id="tuileApp"><span class="ic" data-ic="lock"></span><b>Appareils et validations</b><span class="d" id="dAppareils">Validation, migration novafit.fr</span></button>
       <button class="tuile stop" type="button" id="tuileStop"><span class="ic" data-ic="alert"></span><b id="stopTitre">Stop, on bloque tout</b><span class="d" id="stopInfo">Arrêt d'urgence de tous les envois</span></button>
     </div>
@@ -84,13 +83,6 @@
     <button class="btn" id="btnLimites" type="button">Remettre les limites à zéro</button>
     <p>Utile après des essais : efface le décompte des envois du jour et de l'heure. L'arrêt d'urgence n'est pas modifié.</p>
   </div>
-  </div>
-  <div class="panneau" id="pBons" hidden>
-  <div class="bloc">
-    <h2>Bons d'intervention récents</h2>
-    <p>Supprime toute trace d'un bon d'essai : lignes de l'onglet Bons, suivi d'envoi, PDF du bon dans le Drive et bon en attente de signature.</p>
-    <label class="opt"><input type="checkbox" id="remettre" checked> Remettre la commande dans « Commande en cours »</label>
-    <div id="bons"></div>
   </div>
   </div>
   <div class="panneau" id="pAppareils" hidden>
@@ -121,7 +113,6 @@ const el = id => document.getElementById(id);
 function h(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
 function msg(t, ok) { const m = el('msg'); m.textContent = t || ''; m.className = t ? (ok ? 'ok' : 'ko') : ''; }
 let occupe = false, etat = null;
-const LIB = { envoye: ['Envoyé', 'ok'], signe: ['Signé par le client', 'ok'], asigner: ['Lien en attente de signature', 'warn'], reserve: ['Numéro réservé, envoi non terminé', 'warn'], annule: ['Annulé', ''] };
 
 function dessiner() {
   const r = etat;
@@ -136,42 +127,11 @@ function dessiner() {
   el('infoMigration').textContent = 'Niveau actuel : ' + ['rien', 'avertissement', 'blocage'][r.migration.niveau] + '.';
   el('infoAppareils').textContent = r.appareilsNouveaux ? r.appareilsNouveaux + ' appareil' + (r.appareilsNouveaux > 1 ? 's' : '') + ' à valider.' : 'Aucun nouvel appareil en attente.';
   el('btnAppareils').disabled = !r.appareilsNouveaux;
-  const z = el('bons'); z.innerHTML = '';
-  if (!r.bons.length) z.appendChild(h('div', null, 'Aucun bon.'));
-  r.bons.forEach(b => {
-    const c = h('div', 'bon');
-    const l1 = h('div', 'l1'); l1.appendChild(h('b', null, b.numero + (b.client ? ' · ' + b.client : '')));
-    const lib = LIB[b.etat] || [b.etat || '', ''];
-    l1.appendChild(h('span', 'puce ' + lib[1], lib[0]));
-    c.appendChild(l1);
-    const d = [b.date, b.commande ? 'commande ' + b.commande : '', b.technicien, b.bandes ? b.bandes + ' bande' + (b.bandes > 1 ? 's' : '') : ''].filter(Boolean).join(' · ');
-    if (d) c.appendChild(h('small', null, d));
-    const x = h('button', 'btn danger', 'Supprimer ce bon'); x.type = 'button'; x.style.marginTop = '8px';
-    let sur = false;
-    x.onclick = () => {
-      if (!sur) { sur = true; x.classList.add('sur'); x.textContent = 'Confirmer : supprimer ' + b.numero; setTimeout(() => { sur = false; x.classList.remove('sur'); x.textContent = 'Supprimer ce bon'; }, 6000); return; }
-      supprimer(b, x);
-    };
-    c.appendChild(x);
-    z.appendChild(c);
-  });
 }
 
 async function charger() {
   try { etat = await Nova.api('maintenanceEtat', null, 20000); dessiner(); }
   catch (e) { el('infoCompteur').textContent = ''; msg(e.message, false); }
-}
-
-async function supprimer(b, btn) {
-  if (occupe) return; occupe = true; btn.disabled = true; msg('Suppression...', true);
-  try {
-    const r = await Nova.api('maintenanceSupprimerBon', { numero: b.numero, remettreCommande: el('remettre').checked }, 60000);
-    const d = r.detail;
-    let t = 'Bon ' + r.numero + ' supprimé : ' + d.lignesBons + ' ligne(s) Bons, ' + d.enregistrements + ' suivi(s) d\'envoi, ' + d.pdf + ' PDF, ' + d.attente + ' bon(s) en attente. Commande : ' + d.commande + '.';
-    if (r.compteur > r.dernier) t += '\nLe compteur (' + r.compteur + ') est au-dessus du dernier bon existant (' + r.dernier + ') : enregistre ' + r.dernier + ' ci-dessus pour reprendre la suite.';
-    msg(t, true);
-  } catch (e) { msg(e.message, false); }
-  occupe = false; charger();
 }
 
 el('btnCompteur').onclick = async () => {
@@ -209,7 +169,7 @@ el('btnActualiser').onclick = () => { charger(); chargerResume(); lireVersion();
 function afficher(id) {
   document.querySelectorAll('.panneau').forEach(p => { p.hidden = p.id !== id; });
   el('hub').hidden = !!id;
-  el('titre').textContent = id ? ({ pCompteurs: 'Compteurs', pBons: 'Bons d\'intervention', pAppareils: 'Appareils et validations' })[id] : 'Maintenance';
+  el('titre').textContent = id ? ({ pCompteurs: 'Compteurs', pAppareils: 'Appareils et validations' })[id] : 'Maintenance';
   el('retour').textContent = id ? '← Maintenance' : '← Accueil';
   el('retour').setAttribute('href', id ? '#' : 'index.html');
   msg('');
@@ -254,7 +214,7 @@ async function chargerResume() {
 async function lireVersion() {
   try {
     const r = await fetch(window.CONFIG.URL_API); const d = await r.json();
-    el('versionScript').textContent = 'Script Apps Script : ' + (d.version || 'ancienne version (nouvelle version à déployer)') + ' · Page : 2026-11-23-e';
+    el('versionScript').textContent = 'Script Apps Script : ' + (d.version || 'ancienne version (nouvelle version à déployer)') + ' · Page : 2026-11-23-f';
   } catch (e) { el('versionScript').textContent = 'Version du script illisible (réseau).'; }
 }
 if (Nova.exiger('admin')) {
