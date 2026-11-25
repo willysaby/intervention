@@ -54,6 +54,7 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 #sugg button{display:block;width:100%;text-align:left;padding:13px 12px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:var(--ink)}
 .vide{color:var(--mute);margin-top:24px;text-align:center}
   [hidden] { display:none !important; }
+  #f-m, #e-m { text-transform: uppercase; }
   .prop { margin-top:12px; padding:12px; border:2px solid #e0b100; border-radius:12px; background:var(--card); }
   .prop h3 { margin:0 0 6px; font-size:16px; } .prop .qui { font-size:12px; color:var(--mute); margin-bottom:8px; }
   .prop table { width:100%; font-size:14px; white-space:normal; } .prop td, .prop th { padding:4px 6px; }
@@ -257,7 +258,7 @@ function editer(n) {
   $("#dlg").innerHTML = "<h2 style='margin:0 0 4px;font-size:18px'>Corriger la ligne</h2>" +
     CH.map(([k, l]) => `<label for="e-${k}">${l}</label>` + (k === "c" ? `<textarea id="e-${k}" rows="3"></textarea>` : k === "t" ? '<div class="tps"><input id="e-t" inputmode="decimal"><select id="e-tu"><option value="">Unité ?</option><option value="s">secondes</option><option value="min">minutes</option></select></div>' : `<input id="e-${k}"${k === "m" ? ' list="l-m"' : k === "p" ? ' list="l-p"' : ""}>`)).join("") +
     '<button class="btn" id="e-ok">' + (ADMIN ? "Enregistrer la correction" : "Proposer cette modification") + '</button>' + (ADMIN ? '<button class="btn sup" id="e-sup">Supprimer la ligne</button>' : "") + '<button class="btn sec" id="e-non">Annuler</button><div id="e-retour" class="pied"></div>';
-  CH.forEach(([k]) => { if (k !== "t") $("#e-" + k).value = r[k] ?? ""; });
+  CH.forEach(([k]) => { if (k !== "t") $("#e-" + k).value = k === "m" ? String(r[k] ?? "").toUpperCase() : (r[k] ?? ""); });
   { const t = tempsLire(r.t); $("#e-t").value = t.val; $("#e-tu").value = t.unite || (t.libre || !t.val ? "" : "min"); }
   $("#e-ok").onclick = () => corriger(false);
   if (ADMIN) $("#e-sup").onclick = () => corriger(true);
@@ -267,14 +268,14 @@ function editer(n) {
 
 async function corriger(suppr) {
   const r = rows.find(x => x.n === edN), info = $("#e-retour");
-  const data = {}; CH.forEach(([k]) => data[k] = $("#e-" + k).value.trim());
+  const data = {}; CH.forEach(([k]) => data[k] = $("#e-" + k).value.trim()); data.m = data.m.toUpperCase();
   if (!suppr && tempsManque(data.t, $("#e-tu").value)) { info.textContent = "Choisis l’unité du temps : secondes ou minutes."; return; }
   data.t = tempsFormat(data.t, $("#e-tu").value);
   if (!suppr && (!data.m || !data.p)) { info.textContent = "La matière et la presse sont obligatoires."; return; }
   if (!ADMIN) {
     const ancien = {}; CH.forEach(([k]) => ancien[k] = String(r[k] ?? "").trim());
     const canon = t => { const x = tempsLire(t); return x.libre ? String(t ?? "").trim() : x.val + " " + (x.unite || "min"); };
-    if (CH.every(([k]) => k === "t" ? canon(ancien.t) === canon(data.t) : ancien[k] === data[k])) { info.textContent = "Rien n’a changé."; return; }
+    if (CH.every(([k]) => k === "t" ? canon(ancien.t) === canon(data.t) : (k === "m" ? ancien[k].toUpperCase() : ancien[k]) === data[k])) { info.textContent = "Rien n’a changé."; return; }
     info.textContent = "Envoi…";
     try {
       await Nova.api("jonctionPropose", {prop: {type: "modif", n: edN, ancien, nouveau: data}}, 30000);
@@ -339,7 +340,7 @@ $("#btnUnites").onclick = initialiserUnites;
 
 async function envoyer() {
   const g = id => $("#f-" + id).value.trim();
-  const data = {m:g("m"), p:g("p"), ts:g("ts"), ti:g("ti"), pr:g("pr"), t:g("t"), a:g("a"), c:g("c")};
+  const data = {m:g("m").toUpperCase(), p:g("p"), ts:g("ts"), ti:g("ti"), pr:g("pr"), t:g("t"), a:g("a"), c:g("c")};
   if (tempsManque(data.t, $("#f-tu").value)) { $("#retour").innerHTML = '<div class="msg">Choisis l’unité du temps : secondes ou minutes.</div>'; return; }
   data.t = tempsFormat(data.t, $("#f-tu").value);
   const retour = $("#retour");
@@ -372,6 +373,14 @@ async function envoyer() {
   etat();
 }
 
+/* Matière (référence) : toujours en majuscules, à la saisie, à la correction et dans les propositions */
+document.addEventListener("input", e => {
+  const t = e.target;
+  if (t.id !== "f-m" && t.id !== "e-m") return;
+  const a = t.selectionStart, b = t.selectionEnd, u = t.value.toUpperCase();
+  if (u !== t.value) { t.value = u; try { t.setSelectionRange(a, b); } catch (x) {} }
+});
+
 /* ---------- Propositions (administrateurs) ---------- */
 let PROPS = [];
 const estAdmin = () => !!ADMIN && window.Nova && Nova.peut("admin");
@@ -403,7 +412,7 @@ async function traiter(id, data) {
   mess(id, "Traitement…");
   try { await Nova.api("jonctionPrendre", {id}, 20000); }
   catch (e) { await chargerProps(e.code === "deja" ? "Cette proposition a déjà été traitée par un autre administrateur." : "Échec : " + e.message); return; }
-  const fin = data || {...p.nouveau};
+  const fin = data || {...p.nouveau}; fin.m = String(fin.m || "").toUpperCase();
   fin.t = tempsFormat(tempsAffiche(fin.t), "") || fin.t;
   try {
     const j = p.type === "modif" ? await appel({action:"edit", row: p.n, orig: {m: p.ancien.m, p: p.ancien.p}, data: fin}) : await appel({action:"add", data: fin});
@@ -427,11 +436,11 @@ function corrigerProp(id) {
   $("#dlg").innerHTML = "<h2 style='margin:0 0 4px;font-size:18px'>Corriger avant de valider</h2>" +
     CH.map(([k, l]) => `<label for="e-${k}">${l}</label>` + (k === "c" ? `<textarea id="e-${k}" rows="3"></textarea>` : k === "t" ? '<div class="tps"><input id="e-t" inputmode="decimal"><select id="e-tu"><option value="">Unité ?</option><option value="s">secondes</option><option value="min">minutes</option></select></div>' : `<input id="e-${k}"${k === "m" ? ' list="l-m"' : k === "p" ? ' list="l-p"' : ""}>`)).join("") +
     '<button class="btn" id="e-ok">Valider avec ces corrections</button><button class="btn sec" id="e-non">Annuler</button><div id="e-retour" class="pied"></div>';
-  CH.forEach(([k]) => { if (k !== "t") $("#e-" + k).value = p.nouveau[k] ?? ""; });
+  CH.forEach(([k]) => { if (k !== "t") $("#e-" + k).value = k === "m" ? String(p.nouveau[k] ?? "").toUpperCase() : (p.nouveau[k] ?? ""); });
   { const t = tempsLire(p.nouveau.t); $("#e-t").value = t.val; $("#e-tu").value = t.unite || (t.libre || !t.val ? "" : "min"); }
   $("#e-non").onclick = () => $("#dlg").close();
   $("#e-ok").onclick = () => {
-    const data = {}; CH.forEach(([k]) => data[k] = $("#e-" + k).value.trim());
+    const data = {}; CH.forEach(([k]) => data[k] = $("#e-" + k).value.trim()); data.m = data.m.toUpperCase();
     if (tempsManque(data.t, $("#e-tu").value)) { $("#e-retour").textContent = "Choisis l’unité du temps : secondes ou minutes."; return; }
     data.t = tempsFormat(data.t, $("#e-tu").value);
     if (!data.m || !data.p) { $("#e-retour").textContent = "La matière et la presse sont obligatoires."; return; }
