@@ -686,6 +686,12 @@ async function valider() {
   const technicien = (autreTech ? coches.concat(autreTech) : coches).join(', ');
   const emailClient = document.getElementById('emailClient').value.trim();
   if (!client || !technicien || !emailClient) { msg.textContent = 'Client, au moins un technicien et email sont obligatoires.'; return; }
+  if (!lireHoraire('arrivee') || !lireHoraire('fin')) {
+    msg.textContent = 'L\'heure d\'arrivée et l\'heure de fin sont obligatoires.';
+    const champ = document.getElementById(!lireHoraire('arrivee') ? 'arriveeH' : 'finH');
+    try { champ.scrollIntoView({ block: 'center' }); champ.focus(); } catch (e) {}
+    return;
+  }
   const adr = emailClient.split(/[,;\s]+/).filter(Boolean);
   if (!adr.length || adr.some(a => !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a))) { msg.textContent = 'Adresse email invalide : vérifie-la (plusieurs adresses séparées par une virgule ou un point-virgule).'; return; }
   if (adr.length > 5) { msg.textContent = '5 adresses email au maximum.'; return; }
